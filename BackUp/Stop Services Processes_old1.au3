@@ -19,6 +19,8 @@ Opt("TrayIconDebug", 1) ;0=no info, 1=debug line info
 Opt("WinTitleMatchMode", 2)
 HotKeySet("{ScrollLock}{PAUSE}", "_exit")
 HotKeySet("{F1}", "ToggleScript") ;hotkey used to toggle on/off of script
+TraySetIcon("G:\Users\mmuel\OneDrive\Documents\AutoIT\ff7.ico")
+TraySetIcon($iconfile)
 #EndRegion ;Includes/Options/Permissions/Hotkeys
 
 #Region ;Globals

@@ -45,14 +45,10 @@ When activated, it periodically checks for running processes and services, close
 
 1. **Requirements**: Ensure you have AutoIt installed on your system.  The current compiled version won't run directly as the log location is specific to my system currently.
 
-2. **Icon**: (Optional) To use a custom icon for the app in your systray replace `G:\Users\mmuel\OneDrive\Documents\AutoIT\ff7.ico` with the path to your desired tray icon file.
-    #AutoIt3Wrapper_Res_Icon_Add=G:\Users\mmuel\OneDrive\Documents\AutoIT\ff7.ico
-    Global $iconfile = "G:\Users\mmuel\OneDrive\Documents\AutoIT\ff7.ico"
-    TraySetIcon("G:\Users\mmuel\OneDrive\Documents\AutoIT\ff7.ico")
+2. **Icon**: (Optional) To use a custom icon for the app in your systray edit `Global $iconfile = "G:\Users\mmuel\OneDrive\Documents\AutoIT\ff7.ico"` with the path to your desired tray icon file.
 
-3. **Log File**: Modify the `$sLogFile` path to your preferred log file location.
-      Global $sLogFile = "C:\Users\User\Desktop\closure_log.txt" ;Log File Location
-
+3. **Log File**: Edit `Global $sLogFile = "C:\Users\User\Desktop\closure_log.txt" ;Log File Location` to the path with filename & ext to your preferred log file location.
+      
 4. **Processes and Services**: (Optional)  Customize the `$sProcesses` and `$aServiceNames` arrays to include the processes and services you want to manage.
    When declaing the Global variable  $sProcesses[11]   `11` must match the number of processes declared
 
