@@ -60,4 +60,10 @@ When activated, it periodically checks for running processes and services, close
 1. Run the script with AutoIt/SciTe/ETC / or compile
 2. Use the hotkeys to control the script mode. Stopped/Started
 3. Check the log file for details about process and service closures.
+4. Hovering over the icon in the system tray will update with the part of the script that is currently running
 
+## MISC
+
+The custom function:   _AdvancedRenamer()  is specific to my system.  To remove this function;
+        Remove / comment out func _AdvancedRenamer() 
+        Remove call to _AdvancedRenamer() in the _togglescript() function

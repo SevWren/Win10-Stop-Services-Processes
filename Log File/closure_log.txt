@@ -1,0 +1,474 @@
+
+12:34:29 PM 05/08/2024 - Service 'wuauserv' was closed.
+
+12:36:59 PM 05/08/2024 - Service 'wuauserv' was closed.
+
+12:37:01 PM 05/08/2024 - Service 'wuauserv' was closed.
+
+4:53:25 PM 05/08/2024 - Process 'TrustedInstaller.exe' was closed.
+
+4:55:27 PM 05/08/2024 - Process 'TrustedInstaller.exe' was closed.
+
+4:57:41 PM 05/08/2024 - Service 'sppsvc' was closed.
+
+4:57:43 PM 05/08/2024 - Service 'sppsvc' was closed.
+
+5:00:28 PM 05/08/2024 - Process 'TrustedInstaller.exe' was closed.
+
+5:27:34 PM 05/08/2024 - Service 'wuauserv' was closed.
+
+5:27:35 PM 05/08/2024 - Service 'sppsvc' was closed.
+
+5:27:37 PM 05/08/2024 - Service 'sppsvc' was closed.
+
+5:27:39 PM 05/08/2024 - Service 'sppsvc' was closed.
+
+7:17:31 PM 05/08/2024 - Process 'TrustedInstaller.exe' was closed.
+
+7:17:31 PM 05/08/2024 - Process 'TiWorker.exe' was closed.
+
+7:19:33 PM 05/08/2024 - Process 'TrustedInstaller.exe' was closed.
+
+7:24:34 PM 05/08/2024 - Process 'TrustedInstaller.exe' was closed.
+
+9:17:37 PM 05/08/2024 - Service 'wuauserv' was closed.
+
+9:17:37 PM 05/08/2024 - Service 'UsoSvc' was closed.
+
+9:17:39 PM 05/08/2024 - Service 'wuauserv' was closed.
+
+9:17:40 PM 05/08/2024 - Service 'sppsvc' was closed.
+
+9:17:42 PM 05/08/2024 - Service 'sppsvc' was closed.
+
+10:21:45 PM 05/08/2024 - Process 'taskhostw.exe' was closed.
+
+10:21:45 PM 05/08/2024 - Service 'sppsvc' was closed.
+
+12:45:16 AM 06/08/2024 - Service 'wuauserv' was closed.
+
+12:45:16 AM 06/08/2024 - Service 'UsoSvc' was closed.
+
+12:45:18 AM 06/08/2024 - Service 'wuauserv' was closed.
+
+12:45:20 AM 06/08/2024 - Service 'wuauserv' was closed.
+
+12:45:20 AM 06/08/2024 - Service 'sppsvc' was closed.
+
+12:45:22 AM 06/08/2024 - Service 'sppsvc' was closed.
+
+2:43:17 AM 06/08/2024 - Service 'sppsvc' was closed.
+
+4:42:32 AM 06/08/2024 - Service 'sppsvc' was closed.
+
+4:42:35 AM 06/08/2024 - Service 'sppsvc' was closed.
+
+4:42:37 AM 06/08/2024 - Service 'sppsvc' was closed.
+
+5:02:16 AM 06/08/2024 - Service 'wuauserv' was closed.
+
+5:02:16 AM 06/08/2024 - Service 'UsoSvc' was closed.
+
+5:02:20 AM 06/08/2024 - Service 'wuauserv' was closed.
+
+5:02:20 AM 06/08/2024 - Service 'sppsvc' was closed.
+
+5:02:22 AM 06/08/2024 - Service 'sppsvc' was closed.
+
+5:16:33 AM 06/08/2024 - Service 'WaaSMedicSvc' was closed.
+
+5:16:33 AM 06/08/2024 - Service 'sppsvc' was closed.
+
+5:17:04 AM 06/08/2024 - Process 'TrustedInstaller.exe' was closed.
+
+5:17:04 AM 06/08/2024 - Process 'TiWorker.exe' was closed.
+
+5:19:06 AM 06/08/2024 - Process 'TrustedInstaller.exe' was closed.
+
+5:20:25 AM 06/08/2024 - Process 'TrustedInstaller.exe' was closed.
+
+5:24:07 AM 06/08/2024 - Process 'TrustedInstaller.exe' was closed.
+
+5:24:07 AM 06/08/2024 - Service 'WaaSMedicSvc' was closed.
+
+6:23:46 AM 06/08/2024 - Service 'sppsvc' was closed.
+
+6:55:36 AM 06/08/2024 - Service 'sppsvc' was closed.
+
+6:55:38 AM 06/08/2024 - Service 'sppsvc' was closed.
+
+7:03:14 AM 06/08/2024 - Service 'sppsvc' was closed.
+
+7:03:16 AM 06/08/2024 - Service 'sppsvc' was closed.
+
+7:58:31 AM 06/08/2024 - Service 'sppsvc' was closed.
+
+7:58:33 AM 06/08/2024 - Service 'sppsvc' was closed.
+
+8:12:45 AM 06/08/2024 - Service 'sppsvc' was closed.
+
+8:34:32 AM 06/08/2024 - Service 'sppsvc' was closed.
+
+8:41:08 AM 06/08/2024 - Service 'sppsvc' was closed.
+
+8:41:10 AM 06/08/2024 - Service 'sppsvc' was closed.
+
+8:48:00 AM 06/08/2024 - Service 'sppsvc' was closed.
+
+8:48:02 AM 06/08/2024 - Service 'sppsvc' was closed.
+
+8:58:37 AM 06/08/2024 - Service 'sppsvc' was closed.
+
+8:58:39 AM 06/08/2024 - Service 'sppsvc' was closed.
+
+9:05:02 AM 06/08/2024 - Service 'sppsvc' was closed.
+
+9:17:39 AM 06/08/2024 - Process 'taskhostw.exe' was closed.
+
+9:39:38 AM 06/08/2024 - Service 'sppsvc' was closed.
+
+10:06:27 AM 06/08/2024 - Service 'sppsvc' was closed.
+
+10:37:10 AM 06/08/2024 - Service 'sppsvc' was closed.
+
+10:47:18 AM 06/08/2024 - Service 'sppsvc' was closed.
+
+10:55:21 AM 06/08/2024 - Service 'sppsvc' was closed.
+
+11:06:07 AM 06/08/2024 - Service 'sppsvc' was closed.
+
+11:06:09 AM 06/08/2024 - Service 'sppsvc' was closed.
+
+11:36:35 AM 06/08/2024 - Service 'sppsvc' was closed.
+
+11:36:37 AM 06/08/2024 - Service 'sppsvc' was closed.
+
+11:49:25 AM 06/08/2024 - Service 'sppsvc' was closed.
+
+12:10:13 PM 06/08/2024 - Service 'sppsvc' was closed.
+
+12:31:58 PM 06/08/2024 - Service 'sppsvc' was closed.
+
+12:38:40 PM 06/08/2024 - Service 'sppsvc' was closed.
+
+12:44:32 PM 06/08/2024 - Service 'sppsvc' was closed.
+
+12:56:53 PM 06/08/2024 - Service 'sppsvc' was closed.
+
+1:09:16 PM 06/08/2024 - Service 'sppsvc' was closed.
+
+1:26:14 PM 06/08/2024 - Service 'sppsvc' was closed.
+
+1:26:16 PM 06/08/2024 - Service 'sppsvc' was closed.
+
+1:36:12 PM 06/08/2024 - Service 'sppsvc' was closed.
+
+1:45:38 PM 06/08/2024 - Service 'sppsvc' was closed.
+
+2:24:34 PM 06/08/2024 - Service 'sppsvc' was closed.
+
+2:51:05 PM 06/08/2024 - Service 'sppsvc' was closed.
+
+2:51:07 PM 06/08/2024 - Service 'sppsvc' was closed.
+
+2:56:41 PM 06/08/2024 - Service 'sppsvc' was closed.
+
+2:56:43 PM 06/08/2024 - Service 'sppsvc' was closed.
+
+3:05:21 PM 06/08/2024 - Service 'sppsvc' was closed.
+
+3:16:50 PM 06/08/2024 - Service 'sppsvc' was closed.
+
+3:16:52 PM 06/08/2024 - Service 'sppsvc' was closed.
+
+4:03:35 PM 06/08/2024 - Service 'UsoSvc' was closed.
+
+4:03:37 PM 06/08/2024 - Service 'wuauserv' was closed.
+
+4:03:37 PM 06/08/2024 - Service 'sppsvc' was closed.
+
+4:03:39 PM 06/08/2024 - Service 'sppsvc' was closed.
+
+5:17:40 PM 06/08/2024 - Process 'taskhostw.exe' was closed.
+
+5:25:44 PM 06/08/2024 - Service 'wuauserv' was closed.
+
+5:25:46 PM 06/08/2024 - Service 'wuauserv' was closed.
+
+5:27:35 PM 06/08/2024 - Service 'wuauserv' was closed.
+
+5:27:58 PM 06/08/2024 - Process 'taskhostw.exe' was closed.
+
+5:32:30 PM 06/08/2024 - Process 'TrustedInstaller.exe' was closed.
+
+5:34:31 PM 06/08/2024 - Service 'TrustedInstaller' was closed.
+
+7:17:30 PM 06/08/2024 - Service 'TrustedInstaller' was closed.
+
+7:17:33 PM 06/08/2024 - Process 'TrustedInstaller.exe' was closed.
+
+7:17:33 PM 06/08/2024 - Process 'TiWorker.exe' was closed.
+
+7:19:33 PM 06/08/2024 - Service 'TrustedInstaller' was closed.
+
+9:12:57 PM 06/08/2024 - Service 'sppsvc' was closed.
+
+9:44:45 PM 06/08/2024 - Service 'sppsvc' was closed.
+
+9:44:47 PM 06/08/2024 - Service 'sppsvc' was closed.
+
+10:21:45 PM 06/08/2024 - Service 'sppsvc' was closed.
+
+10:21:46 PM 06/08/2024 - Process 'taskhostw.exe' was closed.
+
+10:21:47 PM 06/08/2024 - Service 'sppsvc' was closed.
+
+11:17:05 PM 06/08/2024 - Service 'TrustedInstaller' was closed.
+
+12:25:57 AM 07/08/2024 - Process 'taskhostw.exe' was closed.
+
+4:32:09 AM 07/08/2024 - Service 'sppsvc' was closed.
+
+4:32:12 AM 07/08/2024 - Service 'sppsvc' was closed.
+
+4:32:14 AM 07/08/2024 - Service 'sppsvc' was closed.
+
+6:46:20 AM 07/08/2024 - Process 'TrustedInstaller.exe' was closed.
+
+6:48:21 AM 07/08/2024 - Service 'TrustedInstaller' was closed.
+
+6:55:12 AM 07/08/2024 - Process 'taskhostw.exe' was closed.
+
+6:55:13 AM 07/08/2024 - Service 'WaaSMedicSvc' was closed.
+
+6:55:13 AM 07/08/2024 - Service 'sppsvc' was closed.
+
+9:36:56 AM 07/08/2024 - Service 'sppsvc' was closed.
+
+9:36:58 AM 07/08/2024 - Service 'sppsvc' was closed.
+
+11:34:52 AM 07/08/2024 - Service 'sppsvc' was closed.
+
+11:34:54 AM 07/08/2024 - Service 'sppsvc' was closed.
+
+11:47:58 AM 07/08/2024 - Service 'sppsvc' was closed.
+
+11:48:00 AM 07/08/2024 - Service 'sppsvc' was closed.
+
+11:55:30 AM 07/08/2024 - Service 'sppsvc' was closed.
+
+11:55:32 AM 07/08/2024 - Service 'sppsvc' was closed.
+
+1:44:40 PM 07/08/2024 - Service 'sppsvc' was closed.
+
+1:44:42 PM 07/08/2024 - Service 'sppsvc' was closed.
+
+3:46:31 PM 07/08/2024 - Service 'sppsvc' was closed.
+
+3:58:57 PM 07/08/2024 - Service 'sppsvc' was closed.
+
+3:58:59 PM 07/08/2024 - Service 'sppsvc' was closed.
+
+4:20:19 PM 07/08/2024 - Service 'wuauserv' was closed.
+
+4:20:19 PM 07/08/2024 - Service 'UsoSvc' was closed.
+
+4:20:21 PM 07/08/2024 - Service 'sppsvc' was closed.
+
+5:17:05 PM 07/08/2024 - Service 'TrustedInstaller' was closed.
+
+5:17:39 PM 07/08/2024 - Process 'taskhostw.exe' was closed.
+
+5:27:33 PM 07/08/2024 - Service 'wuauserv' was closed.
+
+5:27:59 PM 07/08/2024 - Process 'taskhostw.exe' was closed.
+
+5:28:01 PM 07/08/2024 - Service 'wuauserv' was closed.
+
+7:17:31 PM 07/08/2024 - Service 'TrustedInstaller' was closed.
+
+7:22:20 PM 07/08/2024 - Service 'TrustedInstaller' was closed.
+
+7:22:33 PM 07/08/2024 - Service 'sppsvc' was closed.
+
+8:17:41 PM 07/08/2024 - Service 'sppsvc' was closed.
+
+9:53:37 PM 07/08/2024 - Service 'sppsvc' was closed.
+
+10:21:45 PM 07/08/2024 - Service 'sppsvc' was closed.
+
+12:12:25 AM 08/08/2024 - Service 'wuauserv' was closed.
+
+12:12:25 AM 08/08/2024 - Service 'UsoSvc' was closed.
+
+12:12:29 AM 08/08/2024 - Service 'wuauserv' was closed.
+
+12:12:29 AM 08/08/2024 - Service 'sppsvc' was closed.
+
+1:17:29 AM 08/08/2024 - Process 'taskhostw.exe' was closed.
+
+1:17:40 AM 08/08/2024 - Process 'taskhostw.exe' was closed.
+
+4:10:47 AM 08/08/2024 - Service 'sppsvc' was closed.
+
+4:10:50 AM 08/08/2024 - Service 'sppsvc' was closed.
+
+4:10:52 AM 08/08/2024 - Service 'sppsvc' was closed.
+
+4:19:07 AM 08/08/2024 - Service 'sppsvc' was closed.
+
+4:25:49 AM 08/08/2024 - Service 'sppsvc' was closed.
+
+4:25:51 AM 08/08/2024 - Service 'sppsvc' was closed.
+
+4:31:43 AM 08/08/2024 - Service 'sppsvc' was closed.
+
+4:31:45 AM 08/08/2024 - Service 'sppsvc' was closed.
+
+4:38:37 AM 08/08/2024 - Service 'sppsvc' was closed.
+
+4:38:39 AM 08/08/2024 - Service 'sppsvc' was closed.
+
+5:36:11 AM 08/08/2024 - Service 'sppsvc' was closed.
+
+5:36:13 AM 08/08/2024 - Service 'sppsvc' was closed.
+
+5:54:18 AM 08/08/2024 - Service 'sppsvc' was closed.
+
+5:54:20 AM 08/08/2024 - Service 'sppsvc' was closed.
+
+6:35:48 AM 08/08/2024 - Service 'WaaSMedicSvc' was closed.
+
+6:35:48 AM 08/08/2024 - Service 'sppsvc' was closed.
+
+6:35:49 AM 08/08/2024 - Process 'taskhostw.exe' was closed.
+
+6:57:54 AM 08/08/2024 - Service 'sppsvc' was closed.
+
+7:06:20 AM 08/08/2024 - Service 'sppsvc' was closed.
+
+7:19:15 AM 08/08/2024 - Service 'sppsvc' was closed.
+
+7:25:01 AM 08/08/2024 - Service 'TrustedInstaller' was closed.
+
+7:41:13 AM 08/08/2024 - Process 'taskhostw.exe' was closed.
+
+9:24:16 AM 08/08/2024 - Process 'taskhostw.exe' was closed.
+
+9:42:56 AM 08/08/2024 - Process 'taskhostw.exe' was closed.
+
+9:51:25 AM 08/08/2024 - Service 'sppsvc' was closed.
+
+9:51:27 AM 08/08/2024 - Service 'sppsvc' was closed.
+
+10:58:11 AM 08/08/2024 - Service 'sppsvc' was closed.
+
+11:05:56 AM 08/08/2024 - Process 'taskhostw.exe' was closed.
+
+11:17:06 AM 08/08/2024 - Service 'TrustedInstaller' was closed.
+
+11:17:06 AM 08/08/2024 - Process 'TiWorker.exe' was closed.
+
+11:49:14 AM 08/08/2024 - Process 'taskhostw.exe' was closed.
+
+1:39:05 PM 08/08/2024 - Service 'UsoSvc' was closed.
+
+1:39:07 PM 08/08/2024 - Service 'wuauserv' was closed.
+
+1:39:07 PM 08/08/2024 - Service 'UsoSvc' was closed.
+
+1:39:07 PM 08/08/2024 - Service 'sppsvc' was closed.
+
+1:39:09 PM 08/08/2024 - Service 'sppsvc' was closed.
+
+1:40:20 PM 08/08/2024 - Service 'sppsvc' was closed.
+
+3:35:50 PM 08/08/2024 - Service 'sppsvc' was closed.
+
+4:00:24 PM 08/08/2024 - Service 'wuauserv' was closed.
+
+4:00:24 PM 08/08/2024 - Service 'UsoSvc' was closed.
+
+4:00:26 PM 08/08/2024 - Service 'wuauserv' was closed.
+
+4:00:27 PM 08/08/2024 - Service 'sppsvc' was closed.
+
+4:00:29 PM 08/08/2024 - Service 'sppsvc' was closed.
+
+4:18:52 PM 08/08/2024 - Service 'wuauserv' was closed.
+
+4:21:19 PM 08/08/2024 - Service 'wuauserv' was closed.
+
+4:21:21 PM 08/08/2024 - Service 'wuauserv' was closed.
+
+5:27:34 PM 08/08/2024 - Service 'wuauserv' was closed.
+
+5:27:35 PM 08/08/2024 - Service 'sppsvc' was closed.
+
+5:27:37 PM 08/08/2024 - Service 'sppsvc' was closed.
+
+5:27:39 PM 08/08/2024 - Service 'sppsvc' was closed.
+
+5:27:58 PM 08/08/2024 - Process 'taskhostw.exe' was closed.
+
+5:39:04 PM 08/08/2024 - Service 'wuauserv' was closed.
+
+5:39:06 PM 08/08/2024 - Service 'sppsvc' was closed.
+
+7:17:30 PM 08/08/2024 - Service 'TrustedInstaller' was closed.
+
+7:17:30 PM 08/08/2024 - Process 'TiWorker.exe' was closed.
+
+7:17:32 PM 08/08/2024 - Process 'TrustedInstaller.exe' was closed.
+
+7:17:32 PM 08/08/2024 - Process 'TiWorker.exe' was closed.
+
+7:19:33 PM 08/08/2024 - Service 'TrustedInstaller' was closed.
+
+8:17:30 PM 08/08/2024 - Service 'TrustedInstaller' was closed.
+
+10:21:46 PM 08/08/2024 - Service 'sppsvc' was closed.
+
+10:21:46 PM 08/08/2024 - Process 'taskhostw.exe' was closed.
+
+10:21:48 PM 08/08/2024 - Service 'sppsvc' was closed.
+
+2:26:59 AM 09/08/2024 - Service 'sppsvc' was closed.
+
+2:27:01 AM 09/08/2024 - Service 'sppsvc' was closed.
+
+3:16:15 AM 09/08/2024 - Process 'taskhostw.exe' was closed.
+
+3:16:15 AM 09/08/2024 - Service 'WaaSMedicSvc' was closed.
+
+3:16:15 AM 09/08/2024 - Service 'sppsvc' was closed.
+
+4:05:06 AM 09/08/2024 - Service 'sppsvc' was closed.
+
+4:05:08 AM 09/08/2024 - Service 'sppsvc' was closed.
+
+4:05:10 AM 09/08/2024 - Service 'sppsvc' was closed.
+
+5:17:04 AM 09/08/2024 - Process 'TrustedInstaller.exe' was closed.
+
+5:17:04 AM 09/08/2024 - Process 'TiWorker.exe' was closed.
+
+5:19:06 AM 09/08/2024 - Process 'TrustedInstaller.exe' was closed.
+
+5:24:07 AM 09/08/2024 - Process 'TrustedInstaller.exe' was closed.
+
+8:30:02 AM 09/08/2024 - Process 'TrustedInstaller.exe' was closed.
+
+8:32:03 AM 09/08/2024 - Process 'TrustedInstaller.exe' was closed.
+
+8:37:04 AM 09/08/2024 - Process 'TrustedInstaller.exe' was closed.
+
+9:31:07 AM 09/08/2024 - Service 'sppsvc' was closed.
+
+10:12:48 AM 09/08/2024 - Process 'taskhostw.exe' was closed.
+
+12:16:34 PM 09/08/2024 - Service 'sppsvc' was closed.
+
+12:16:36 PM 09/08/2024 - Service 'sppsvc' was closed.
+
+12:21:48 PM 09/08/2024 - Service 'sppsvc' was closed.
