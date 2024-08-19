@@ -1,5 +1,9 @@
 # Win10-Stop-Services-Processes
-Script that runs 24/7 preventing processes/services required for windows update to run. 
+
+TLDR - I got tired of windows 10 updates running nonstop only to only fail on a certain patch.  
+
+Script runs 24/7 periodacly terminating processes/services required for windows update to download & install automaticaly. 
+Script also terminates certain installers. 
 
 
 This AutoIt script is designed to manage and control specific processes and services on a Windows 10 system.
