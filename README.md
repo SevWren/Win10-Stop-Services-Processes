@@ -1,8 +1,3 @@
-![Alt text](https://github.com/SevWren/Win10-Stop-Services-Processes/blob/main/assets/images/auto_it_150x150.png)
-![Alt text](assets/images/auto_it_150x150.png) 
-# Win10-Stop-Services-Processes
-
-
 TLDR - I got tired of windows 10 updates running nonstop only to only fail on a certain patch.  
 
 Script runs 24/7 periodacly terminating processes/services required for windows update to download & install automaticaly. 
