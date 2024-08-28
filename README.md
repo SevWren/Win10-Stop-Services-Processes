@@ -1,4 +1,7 @@
+![Alt text](https://github.com/SevWren/Win10-Stop-Services-Processes/blob/main/assets/images/auto_it_150x150.png)
+![Alt text](assets/images/auto_it_150x150.png) 
 # Win10-Stop-Services-Processes
+
 
 TLDR - I got tired of windows 10 updates running nonstop only to only fail on a certain patch.  
 
@@ -64,4 +67,4 @@ When activated, it periodically checks for running processes and services, close
 
 ## MISC
 ⚠️The custom function: _AdvancedRenamer() is specific to my system.
-To Disable - Change "Glboal $bEnableAdvancedRenamer = 1" to 0
+To Disable Change The variable: "Global $bEnableAdvancedRenamer = 1" to  "Global $bEnableAdvancedRenamer = 0"
