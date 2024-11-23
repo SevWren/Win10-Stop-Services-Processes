@@ -30,15 +30,7 @@ Global $iLastStopServices = TimerInit() ;Variable to track the last time _stopse
 Global $iLastStopProcesses = TimerInit() ;Variable to track the last time _closeinstaller() was called.
 Global $iconfile = "G:\Users\mmuel\OneDrive\Documents\AutoIT\ff7.ico"
 Global $sLogFile = "G:\login\closure_log.txt"
-Global $iLogLevel = 2 ; 0=Errors only, 1=Basic logging, 2=Detailed logging
-Global $bLogToConsole = True ; Enable console logging alongside file logging
 TraySetIcon($iconfile)
-
-; Initialize logging
-If Not FileExists($sLogFile) Then
-    DirCreate(StringRegExpReplace($sLogFile, "\\[^\\]+$", ""))
-    _LogMessage("Log file initialized", "System", 1)
-EndIf
 #EndRegion ;Globals
 
 While 1  ;Keeps script running indefinitely.  Hotkeys determine which path the script heads
@@ -47,11 +39,9 @@ WEnd
 
 Func ToggleScript() ;handles the toggling on and off of script.  Eventually use this to handle halting the main loop instead.
     If $bScriptRunning Then
-        _LogMessage("F1 pressed - Pausing script", "System", 1)
         MsgBox($MB_SYSTEMMODAL, "AutoIT Script", "Script paused!", 1)
         $bScriptRunning = False ;this exits this function
     Else
-        _LogMessage("F1 pressed - Starting script", "System", 1)
         MsgBox($MB_SYSTEMMODAL, "AutoIT Script", "Script started!", 1)
         $bScriptRunning = True
     EndIf
@@ -72,91 +62,64 @@ Func ToggleScript() ;handles the toggling on and off of script.  Eventually use 
 EndFunc   ;==>ToggleScript
 
 Func _CloseInstaller() ; Handles closing of all the processes stored in the $sProcesses array
-    Local $iSuccess = 0, $iFailure = 0, $bActionTaken = False
-    
-    For $i = 0 To UBound($sProcesses) - 1
-        If ProcessExists($sProcesses[$i]) Then
-            $bActionTaken = True
-            Local $iResult = ProcessClose($sProcesses[$i])
-            If $iResult = 1 Then
-                $iSuccess += 1
-                _LogMessage("Successfully closed process: " & $sProcesses[$i], "Process", 1)
-            Else
-                $iFailure += 1
-                _LogMessage("Failed to close process: " & $sProcesses[$i] & " (Error: " & @error & ")", "Process", 0)
-            EndIf
+    For $i = 0 To UBound($sProcesses) - 1 ; Loop that is determined on the total number of rows in $sProcesses array
+        If ProcessExists($sProcesses[$i]) Then ; If value in array is valid then
+            ProcessClose($sProcesses[$i]) ; Close the process stored in the current row $i of the $sProcesses array
+            ; Log the process closure
+            LogClosure($sProcesses[$i], "Process")
         EndIf
-    Next
-    
-    If $bActionTaken Then
-        _LogMessage("Process closure summary - Success: " & $iSuccess & ", Failed: " & $iFailure, "Process", 1)
-    EndIf
+    Next ; Continue loop
 EndFunc   ;==>_CloseInstaller
 
 Func _stopservicescustom() ; Check if a service is running and stop it, then log the closure
-    Local $iSuccess = 0, $iFailure = 0, $bActionTaken = False
-    
+    ; Run cmd prompt and pass net stop commands and set cmd prompt to hidden
+    Local $bServiceStopped = False
+
+    ; Define an array of service names
     Local $aServiceNames = ["TrustedInstaller", "wuauserv", "UsoSvc", "DoSvc", "WaaSMedicSvc", "sppsvc"]
-    
+
+    ; Loop through each service name in the array
     For $i = 0 To UBound($aServiceNames) - 1
+        ; Check if the service is running
         If _ServiceRunning("", $aServiceNames[$i]) Then
-            $bActionTaken = True
-            Local $iResult = _stopservice("", $aServiceNames[$i])
-            If $iResult = 1 Then
-                $iSuccess += 1
-                _LogMessage("Successfully stopped service: " & $aServiceNames[$i], "Service", 1)
-            Else
-                $iFailure += 1
-                _LogMessage("Failed to stop service: " & $aServiceNames[$i] & " (Error: " & @error & ")", "Service", 0)
-            EndIf
+            ; Stop the service
+            _stopservice("", $aServiceNames[$i])
+            ; Set the flag to indicate that a service was stopped
+            $bServiceStopped = True
+            ; Log the service closure
+            LogClosure($aServiceNames[$i], "Service")
         EndIf
     Next
-    
-    ; Special handling for sppsvc
+
+    ; Special handling for sppsvc service as it requires ProcessClose
     If _ServiceRunning("", "sppsvc") Then
-        $bActionTaken = True
-        Local $iResult = ProcessClose("sppsvc.exe")
-        If $iResult = 1 Then
-            $iSuccess += 1
-            _LogMessage("Successfully stopped sppsvc process", "Service", 1)
-        Else
-            $iFailure += 1
-            _LogMessage("Failed to stop sppsvc process (Error: " & @error & ")", "Service", 0)
-        EndIf
-    EndIf
-    
-    If $bActionTaken Then
-        _LogMessage("Service stop summary - Success: " & $iSuccess & ", Failed: " & $iFailure, "Service", 1)
+        ProcessClose("sppsvc.exe")
+        $bServiceStopped = True
+        ; Log the service closure
+        LogClosure("sppsvc", "Service")
     EndIf
 EndFunc   ;==>_stopservicescustom
 
-Func _LogMessage($sMessage, $sType, $iLevel)
-    If $iLevel > $iLogLevel Then Return ; Skip if message level is higher than current log level
-    
-    Local $sDateTime = _NowTime(12) & " " & @MDAY & "/" & @MON & "/" & @YEAR
-    Local $sLogEntry = @CRLF & $sDateTime & " [" & $sType & "] " & $sMessage
-    
-    ; Attempt to write to log file
-    Local $hFile = FileOpen($sLogFile, 1)
-    If $hFile = -1 Then
-        ConsoleWrite("Error: Could not open log file for writing" & @CRLF)
-        Return
-    EndIf
-    
-    FileWrite($hFile, $sLogEntry)
-    FileClose($hFile)
-    
-    ; Console output if enabled
-    If $bLogToConsole Then
-        ConsoleWrite($sLogEntry & @CRLF)
-    EndIf
-EndFunc
+Func LogClosure($sName, $sType) ; Function to log the date and time of closure
+    Local $sDateTime = _NowTime(12) & " " & @MDAY & "/" & @MON & "/" & @YEAR      ; Get the current date and time
+    Local $sLogEntry = @CRLF & $sDateTime & " - " & $sType & " '" & $sName & "' was closed." & @CRLF ; Create the log entry
+    FileWrite($sLogFile, $sLogEntry)
+EndFunc   ;==>LogClosure
+
+Func CheckElapsedTime($iStartTime, $iInterval)  ;handles the calculation of time difference in ms to seconds
+    Return TimerDiff($iStartTime) >= ($iInterval * 1000)
+EndFunc   ;==>CheckElapsedTime
+
+Func _LogTest($sLogEntry) ;writes $sLogEntry data to file
+    FileWrite($sLogFile, $sLogEntry)
+EndFunc   ;==>_LogTest
 
 Func _exit()
-    _LogMessage("Script termination requested", "System", 1)
-    _LogMessage("Script Was Terminated by _exit()", "System", 1)
+    Local $sDateTime = _NowTime(12) & " " & @MDAY & "/" & @MON & "/" & @YEAR ;Get the current date and time
+    Local $sLogEntry = @CRLF & $sDateTime & " - " & "Script Was Terminated by _exit()" & @CRLF ; Create the log entry
+    FileWrite($sLogFile, $sLogEntry) ; Write the log entry to the log file
     Exit
-EndFunc
+EndFunc   ;==>_exit
 
 Func _AdvancedRenamer()
     If WinExists("[CLASS:TPleaseRegisterForm]") Then
@@ -165,7 +128,3 @@ Func _AdvancedRenamer()
         WinClose("[CLASS:TPleaseRegisterForm]")
     EndIf
 EndFunc   ;==>_AdvancedRenamer
-
-Func CheckElapsedTime($iStartTime, $iInterval)  ;handles the calculation of time difference in ms to seconds
-    Return TimerDiff($iStartTime) >= ($iInterval * 1000)
-EndFunc   ;==>CheckElapsedTime
