@@ -1,5 +1,7 @@
-# Win10-Stop-Services-Processes
-Script that runs 24/7 preventing processes/services required for windows update to run. 
+TLDR - I got tired of windows 10 updates running nonstop only to only fail on a certain patch.  
+
+Script runs 24/7 periodacly terminating processes/services required for windows update to download & install automaticaly. 
+Script also terminates certain installers. 
 
 This AutoIt script is designed to manage and control specific processes and services on a Windows 10 system.
 It handles the unattended closing of processes and stopping of services related to Windows 10 Update & background software installs, logs events to file, and handles specific window events automatically.
@@ -67,6 +69,8 @@ When activated, it periodically checks for running processes and services, close
 4. Hover over the icon in the system tray to see the current script state
 
 ## MISC
+⚠️The custom function: _AdvancedRenamer() is specific to my system.
+To Disable Change The variable: "Global $bEnableAdvancedRenamer = 1" to  "Global $bEnableAdvancedRenamer = 0"
 
 The custom function `_AdvancedRenamer()` is specific to my system. To remove this function:
 - Remove/comment out the `_AdvancedRenamer()` function
