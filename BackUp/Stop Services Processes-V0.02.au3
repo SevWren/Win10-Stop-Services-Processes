@@ -1,11 +1,10 @@
 #RequireAdmin
 #Region ;**** Directives created by AutoIt3Wrapper_GUI ****
 #AutoIt3Wrapper_Icon=G:\Users\mmuel\OneDrive\Documents\AutoIT\ff7.ico
-#AutoIt3Wrapper_Outfile=..\..\..\Desktop\Stop Services - Processes.Exe
+#AutoIt3Wrapper_Outfile=..\..\..\..\..\..\login\Stop Services - Processes.Exe
 #AutoIt3Wrapper_Compression=0
 #AutoIt3Wrapper_Res_Description=Script monitors processes and services related to windows update and terminates if running.
 #AutoIt3Wrapper_Res_Icon_Add=G:\Users\mmuel\OneDrive\Documents\AutoIT\ff7.ico
-#AutoIt3Wrapper_Add_Constants=n
 #AutoIt3Wrapper_AU3Check_Parameters=-q -d -w 1 -w 2 -w 3 -w 4
 #EndRegion ;**** Directives created by AutoIt3Wrapper_GUI ****
 #AutoIt3Wrapper_ShowProgress=Y
