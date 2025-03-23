@@ -1,4 +1,6 @@
 #RequireAdmin
+_LogMessage("Script started", "System", 1)
+; Local $iResult = ProcessClose("sppsvc.exe")
 #Region ;**** Directives created by AutoIt3Wrapper_GUI ****
 #AutoIt3Wrapper_Icon=G:\Users\mmuel\OneDrive\Documents\AutoIT\ff7.ico
 #AutoIt3Wrapper_Outfile=..\..\..\Desktop\Stop Services - Processes.Exe
@@ -33,7 +35,7 @@ Global $sLogFile = "G:\login\closure_log.txt"
 Global $iLogLevel = 2 ; 0=Errors only, 1=Basic logging, 2=Detailed logging
 Global $bLogToConsole = True ; Enable console logging alongside file logging
 TraySetIcon($iconfile)
-
+Exit
 ; Initialize logging
 If Not FileExists($sLogFile) Then
     DirCreate(StringRegExpReplace($sLogFile, "\\[^\\]+$", ""))
@@ -116,6 +118,9 @@ Func _stopservicescustom() ; Check if a service is running and stop it, then log
     If _ServiceRunning("", "sppsvc") Then
         $bActionTaken = True
         Local $iResult = ProcessClose("sppsvc.exe")
+        #ConsoleWrite('@@ Debug(' & @ScriptLineNumber & ') : $iResult =  = ' & $iResult =  & @CRLF & '>Error code: ' & @error & @CRLF) ;### Debug Console
+        ConsoleWrite('@@ Debug(' & @ScriptLineNumber & ') : $iResult = ' & $iResult & @CRLF & '>Error code: ' & @error & @CRLF) ;### Debug Console
+
         If $iResult = 1 Then
             $iSuccess += 1
             _LogMessage("Successfully stopped sppsvc process", "Service", 1)
