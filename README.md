@@ -1,3 +1,5 @@
+[![AutoIt](https://avatars.githubusercontent.com/u/5172713?s=25&v=4)](https://github.com/autoit)
+
 # Stop Services Processes
 
 TLDR - I got tired of Windows 10 updates running nonstop only to only fail on a certain patch.
@@ -6,8 +8,6 @@ This script runs 24/7, periodically terminating processes and services required 
 
 This AutoIt script is designed to manage and control specific processes and services on a Windows 10 system.
 It handles the unattended closing of processes and stopping of services related to Windows Update & background software installs, logs events to file, and handles specific window events automatically.
-
-[![AutoIt](https://avatars.githubusercontent.com/u/5172713?s=200&v=4)](https://github.com/autoit)
 
 This script is written in [AutoIt](https://github.com/autoit), a scripting language designed for automating the Windows GUI and general scripting.
 
@@ -69,7 +69,7 @@ When activated, it periodically checks for running processes and services, close
 
 ## Usage
 
-**To run the script, download the executable from [Releases](https://github.com/SevWren/Win10-Stop-Services-Processes/releases/tag/Working) and launch it. No AutoIt installation is required to run the .exe!**
+**To run the script, download the executable from [`Releases`](https://github.com/SevWren/Win10-Stop-Services-Processes/releases/tag/Working) and launch it. No AutoIt installation is required to run the .exe!**
 
 1. **DOWNLOAD EXE FROM [`RELEASES`](https://github.com/SevWren/Win10-Stop-Services-Processes/releases/tag/Working)**
 2. Use F1 to toggle the script between stopped/started states (actions are logged)
