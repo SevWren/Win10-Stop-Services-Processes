@@ -1,11 +1,15 @@
+[![AutoIt](https://avatars.githubusercontent.com/u/5172713?s=25&v=4)](https://github.com/autoit)
+
 # Stop Services Processes
 
 TLDR - I got tired of Windows 10 updates running nonstop only to only fail on a certain patch.
 
-This script runs 24/7, periodically terminating processes and services required for Windows Update to download & install automatically.  The script also terminates certain installers.
+This script runs 24/7, periodically terminating processes and services required for Windows Update to download & install automatically. The script also terminates certain installers.
 
 This AutoIt script is designed to manage and control specific processes and services on a Windows 10 system.
 It handles the unattended closing of processes and stopping of services related to Windows Update & background software installs, logs events to file, and handles specific window events automatically.
+
+This script is written in [AutoIt](https://github.com/autoit), a scripting language designed for automating the Windows GUI and general scripting.
 
 ## Features
 
@@ -42,7 +46,7 @@ When activated, it periodically checks for running processes and services, close
 
 - **`ToggleScript()`**: Handles starting and pausing the script. Logs F1 hotkey presses and their actions (starting/pausing).
 - **`_CloseInstaller()`**: Iterates over the `$sProcesses` array, closing each process that is running. Only logs when processes are actually found and closed.
-- **`_stopservicescustom()`**: Checks for specific services, stops them if running. Only logs when services are actually found and stopped.  It also handles the `sppsvc` process separately.
+- **`_stopservicescustom()`**: Checks for specific services, stops them if running. Only logs when services are actually found and stopped. It also handles the `sppsvc` process separately.
 - **`_LogMessage()`**: Enhanced logging function that supports different message types and log levels.
 - **`CheckElapsedTime($iStartTime, $iInterval)`**: Calculates if the specified time interval has passed since the last function call.
 - **`_AdvancedRenamer()`**: Checks for a specific window class and closes it if found.
@@ -50,7 +54,7 @@ When activated, it periodically checks for running processes and services, close
 
 ## Setup
 
-1. **Requirements**: Ensure you have AutoIt installed on your system.
+1. **Requirements**: Ensure you have [AutoIt](https://github.com/autoit) installed on your system if you want to run the `.au3` source code directly.
 
 2. **Icon**: (Optional) To use a custom icon for the app in your systray edit `Global $iconfile = "G:\Users\mmuel\OneDrive\Documents\AutoIT\ff7.ico"` with the path to your desired tray icon file.
 
@@ -65,7 +69,9 @@ When activated, it periodically checks for running processes and services, close
 
 ## Usage
 
-1. Run the script with AutoIt/SciTe/ETC or compile it
+**To run the script, download the executable from [`Releases`](https://github.com/SevWren/Win10-Stop-Services-Processes/releases/tag/Working) and launch it. No AutoIt installation is required to run the .exe!**
+
+1. **DOWNLOAD EXE FROM [`RELEASES`](https://github.com/SevWren/Win10-Stop-Services-Processes/releases/tag/Working)**
 2. Use F1 to toggle the script between stopped/started states (actions are logged)
 3. Check the log file for details about:
    - F1 hotkey presses (start/pause actions)
@@ -75,9 +81,9 @@ When activated, it periodically checks for running processes and services, close
 
 ## MISC
 
-⚠️ The `_AdvancedRenamer()` function is specific to my system.  This function checks for a specific window class (`TPleaseRegisterForm`) and closes it if found (likely related to an "Advanced Renamer" registration prompt).
+⚠️ The `_AdvancedRenamer()` function is specific to my system. This function checks for a specific window class (`TPleaseRegisterForm`) and closes it if found (likely related to an "Advanced Renamer" registration prompt).
 
 To disable this function:
 
 1. Comment out the line `_AdvancedRenamer()` inside the `ToggleScript()` function.
-2.  Comment out the `_AdvancedRenamer()` function definition itself.
+2. Comment out the `_AdvancedRenamer()` function definition itself.
