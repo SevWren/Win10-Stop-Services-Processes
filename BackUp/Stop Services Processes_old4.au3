@@ -1,7 +1,7 @@
 #RequireAdmin
 #Region ;**** Directives created by AutoIt3Wrapper_GUI ****
 #AutoIt3Wrapper_Icon=G:\Users\mmuel\OneDrive\Documents\AutoIT\ff7.ico
-#AutoIt3Wrapper_Outfile=g:\Users\Administrator\Desktop\Stop Services - Processes.Exe
+#AutoIt3Wrapper_Outfile=..\..\..\Desktop\Stop Services - Processes.Exe
 #AutoIt3Wrapper_Compression=0
 #AutoIt3Wrapper_Res_Description=Script monitors processes and services related to windows update and terminates if running.
 #AutoIt3Wrapper_Res_Icon_Add=G:\Users\mmuel\OneDrive\Documents\AutoIT\ff7.ico
@@ -18,7 +18,7 @@
 Opt("TrayIconDebug", 1) ;0=no info, 1=debug line info
 Opt("WinTitleMatchMode", 2)
 HotKeySet("{ScrollLock}{PAUSE}", "_exit")
-HotKeySet("+{F1}", "ToggleScript") ;hotkey used to toggle on/off of script.
+HotKeySet("{F1}", "ToggleScript") ;hotkey used to toggle on/off of script.
 HotKeySet("^9", "SetProcessPriority") ;ctrl and 9 hotkey for process priority
 
 #EndRegion ;Includes/Options/Permissions/Hotkeys
@@ -40,7 +40,6 @@ TraySetIcon($iconfile)
 If Not FileExists($sLogFile) Then
 	DirCreate(StringRegExpReplace($sLogFile, "\\[^\\]+$", ""))
 	_LogMessage("Log file initialized", "System", 1)
-	ConsoleWrite("Log file initialized" & @CRLF)
 EndIf
 #EndRegion ;Globals
 
@@ -51,12 +50,10 @@ WEnd
 Func ToggleScript() ;handles the toggling on and off of script.  Eventually use this to handle halting the main loop instead.
 	If $bScriptRunning Then
 		_LogMessage("F1 pressed - Pausing script", "System", 1)
-		ConsoleWrite("F1 pressed - Pausing script" & @CRLF)
 		MsgBox($MB_SYSTEMMODAL, "AutoIT Script", "Script paused!", 1)
 		$bScriptRunning = False ;this exits this function
 	Else
 		_LogMessage("F1 pressed - Starting script", "System", 1)
-		ConsoleWrite("F1 pressed - Starting script" & @CRLF)
 		MsgBox($MB_SYSTEMMODAL, "AutoIT Script", "Script started!", 1)
 		$bScriptRunning = True
 	EndIf
@@ -86,18 +83,15 @@ Func _CloseInstaller() ; Handles closing of all the processes stored in the $sPr
 			If $iResult = 1 Then
 				$iSuccess += 1
 				_LogMessage("Successfully closed process: " & $sProcesses[$i], "Process", 1)
-				ConsoleWrite("Successfully closed process: " & $sProcesses[$i] & @CRLF)
 			Else
 				$iFailure += 1
 				_LogMessage("Failed to close process: " & $sProcesses[$i] & " (Error: " & @error & ")", "Process", 0)
-				ConsoleWrite("Failed to close process: " & $sProcesses[$i] & " (Error: " & @error & ")" & @CRLF)
 			EndIf
 		EndIf
 	Next
 
 	If $bActionTaken Then
 		_LogMessage("Process closure summary - Success: " & $iSuccess & ", Failed: " & $iFailure, "Process", 1)
-		ConsoleWrite("Process closure summary - Success: " & $iSuccess & ", Failed: " & $iFailure & @CRLF)
 	EndIf
 EndFunc   ;==>_CloseInstaller
 
@@ -113,21 +107,18 @@ Func _stopservicescustom() ; Check if a service is running and stop it, then log
 			If $iResult = 1 Then
 				$iSuccess += 1
 				_LogMessage("Successfully stopped service: " & $aServiceNames[$i], "Service", 1)
-				ConsoleWrite("Successfully stopped service: " & $aServiceNames[$i] & @CRLF)
 			Else
 				$iFailure += 1
 				_LogMessage("Failed to stop service: " & $aServiceNames[$i] & " (Error: " & @error & ")", "Service", 0)
-				ConsoleWrite("Failed to stop service: " & $aServiceNames[$i] & " (Error: " & @error & ")" & @CRLF)
 			EndIf
 		EndIf
 	Next
 
-	; service manages Windows components, so it requires special handling 
-	; to ensure it terminates the service correctly.
+	; Special handling for sppsvc
 	If _ServiceRunning("", "sppsvc") Then
 		$bActionTaken = True
-		Local $iResult2 = ProcessClose("sppsvc.exe")
-		If $iResult2 = 1 Then
+		Local $iResult = ProcessClose("sppsvc.exe")
+		If $iResult = 1 Then
 			$iSuccess += 1
 			_LogMessage("Successfully stopped sppsvc process", "Service", 1)
 		Else
@@ -141,13 +132,15 @@ Func _stopservicescustom() ; Check if a service is running and stop it, then log
 	EndIf
 EndFunc   ;==>_stopservicescustom
 
-Func _LogMessage($sMessage, $sType, $iLevel) ;describe what this achieves
+Func _LogMessage($sMessage, $sType, $iLevel)
 	If $iLevel > $iLogLevel Then Return ; Skip if message level is higher than current log level
+
 	Local $sDateTime = _NowTime(12) & " " & @MDAY & "/" & @MON & "/" & @YEAR
 	Local $sLogEntry = @CRLF & $sDateTime & " [" & $sType & "] " & $sMessage
-	Local $hFile = FileOpen($sLogFile, 1) ; Attempt to write to log file
 
-If $hFile = -1 Then
+	; Attempt to write to log file
+	Local $hFile = FileOpen($sLogFile, 1)
+	If $hFile = -1 Then
 		ConsoleWrite("Error: Could not open log file for writing" & @CRLF)
 		Return
 	EndIf
@@ -155,7 +148,8 @@ If $hFile = -1 Then
 	FileWrite($hFile, $sLogEntry)
 	FileClose($hFile)
 
-	If $bLogToConsole Then 	; Console output if enabled
+	; Console output if enabled
+	If $bLogToConsole Then
 		ConsoleWrite($sLogEntry & @CRLF)
 	EndIf
 EndFunc   ;==>_LogMessage
@@ -166,7 +160,7 @@ Func _exit()
 	Exit
 EndFunc   ;==>_exit
 
-Func _AdvancedRenamer() ; monitors if window exists and closes if true
+Func _AdvancedRenamer()
 	If WinExists("[CLASS:TPleaseRegisterForm]") Then
 		ConsoleWrite("In _AdvancedRenamer function" & @CRLF)
 		ConsoleWrite("Passed check, closing window" & @CRLF)
@@ -174,86 +168,82 @@ Func _AdvancedRenamer() ; monitors if window exists and closes if true
 	EndIf
 EndFunc   ;==>_AdvancedRenamer
 
-Func CheckElapsedTime($iStartTime, $iInterval)  ;calc of time difference in ms to seconds
+Func CheckElapsedTime($iStartTime, $iInterval)  ;handles the calculation of time difference in ms to seconds
 	Return TimerDiff($iStartTime) >= ($iInterval * 1000)
 EndFunc   ;==>CheckElapsedTime
 
 Func SetProcessPriority()
-	Local $sProcessName = InputBox("Process Priority", "Enter process name:")
-	If @error Then ; User pressed Cancel
-		_LogMessage("Process priority setting cancelled by user (Process Name Input)", "ProcessPriority", 1)
-		Return ; Exit function if user cancels
-	EndIf
-	If $sProcessName = "" Then ; User entered empty string
-		_LogMessage("Process priority setting cancelled: Process name cannot be empty.", "ProcessPriority", 1)
-		MsgBox($MB_SYSTEMMODAL, "Process Priority", "Process name cannot be empty.", 1)
-		Return
-	EndIf
+    Local $sProcessName = InputBox("Process Priority", "Enter process name:")
+    If @error Then ; User pressed Cancel
+        _LogMessage("Process priority setting cancelled by user (Process Name Input)", "ProcessPriority", 1)
+        Return ; Exit function if user cancels
+    EndIf
+    If $sProcessName = "" Then ; User entered empty string
+        _LogMessage("Process priority setting cancelled: Process name cannot be empty.", "ProcessPriority", 1)
+        MsgBox($MB_SYSTEMMODAL, "Process Priority", "Process name cannot be empty.", 1)
+        Return
+    EndIf
 
-	Local $sPriorityLevel = InputBox("Process Priority", "Select priority level:" & @CRLF & "1 - Below Normal" & @CRLF & "2 - Normal" & @CRLF & "3 - Above Normal")
-	If @error Then ; User pressed Cancel
-		_LogMessage("Process priority setting cancelled by user (Priority Level Input)", "ProcessPriority", 1)
-		Return ; Exit if user cancels
-	EndIf
+    Local $sPriorityLevel = InputBox("Process Priority", "Select priority level:" & @CRLF & "1 - Below Normal" & @CRLF & "2 - Normal" & @CRLF & "3 - Above Normal")
+    If @error Then ; User pressed Cancel
+        _LogMessage("Process priority setting cancelled by user (Priority Level Input)", "ProcessPriority", 1)
+        Return ; Exit if user cancels
+    EndIf
 
-	; Declare a variable to store the priority constant
-	Local $iPriorityConst
-	; Determine the priority level based on user input
-	Switch $sPriorityLevel
-		Case "1"
-			$iPriorityConst = $PROCESS_BELOWNORMAL ; Set priority to Below Normal
-		Case "2"
-			$iPriorityConst = $PROCESS_NORMAL ; Set priority to Normal
-		Case "3"
-			$iPriorityConst = $PROCESS_ABOVENORMAL ; Set priority to Above Normal
-		Case Else
-			; Log an error message for invalid input
-			_LogMessage("Invalid priority level entered: " & $sPriorityLevel, "ProcessPriority", 0)
-			ConsoleWrite("Invalid priority level entered: " & $sPriorityLevel & @CRLF)
-			MsgBox($MB_SYSTEMMODAL, "Process Priority", "Invalid priority level. Please enter 1, 2, or 3.", 1)
-			Return ; Exit if invalid input
-	EndSwitch
+    Local $iPriorityConst
+    Switch $sPriorityLevel
+        Case "1"
+            $iPriorityConst = $PROCESS_BELOWNORMAL
+        Case "2"
+            $iPriorityConst = $PROCESS_NORMAL
+        Case "3"
+            $iPriorityConst = $PROCESS_ABOVENORMAL
+        Case Else
+            _LogMessage("Invalid priority level entered: " & $sPriorityLevel, "ProcessPriority", 0)
+            MsgBox($MB_SYSTEMMODAL, "Process Priority", "Invalid priority level. Please enter 1, 2, or 3.", 1)
+            Return ; Exit if invalid input
+    EndSwitch
 
-	Local $aProcessList = ProcessList($sProcessName)
-	If @error Or $aProcessList[0][0] = 0 Then ; Check for error or no processes found
-		_LogMessage("No processes found with the name '" & $sProcessName & "'.", "ProcessPriority", 1)
-		MsgBox($MB_SYSTEMMODAL, "Process Priority", "No processes found with the name '" & $sProcessName & "'.", 1)
-		Return
-	EndIf
+    Local $aProcessList = ProcessList($sProcessName)
+    If @error Or $aProcessList[0][0] = 0 Then ; Check for error or no processes found
+        _LogMessage("No processes found with the name '" & $sProcessName & "'.", "ProcessPriority", 1)
+        MsgBox($MB_SYSTEMMODAL, "Process Priority", "No processes found with the name '" & $sProcessName & "'.", 1)
+        Return
+    EndIf
 
-	Local $iSuccessCount = 0
-	Local $iFailureCount = 0
-	Local $sPriorityName
-	Switch $iPriorityConst
-		Case $PROCESS_BELOWNORMAL
-			$sPriorityName = "Below Normal"
-		Case $PROCESS_NORMAL
-			$sPriorityName = "Normal"
-		Case $PROCESS_ABOVENORMAL
-			$sPriorityName = "Above Normal"
-	EndSwitch
+    Local $iSuccessCount = 0
+    Local $iFailureCount = 0
+    Local $sPriorityName
+    Switch $iPriorityConst
+        Case $PROCESS_BELOWNORMAL
+            $sPriorityName = "Below Normal"
+        Case $PROCESS_NORMAL
+            $sPriorityName = "Normal"
+        Case $PROCESS_ABOVENORMAL
+            $sPriorityName = "Above Normal"
+    EndSwitch
 
-	For $i = 1 To $aProcessList[0][0] ; Loop through each process in the list (skip header row)
-		Local $iPID = $aProcessList[$i][1] ; Get the PID
-		If ProcessSetPriority($iPID, $iPriorityConst) Then
-			$iSuccessCount += 1
-		Else
-			$iFailureCount += 1
-			_LogMessage("Failed to set priority for process '" & $sProcessName & "' (PID: " & $iPID & ") (Error: " & @error & ")", "ProcessPriority", 0)
-		EndIf
-	Next
+    For $i = 1 To $aProcessList[0][0] ; Loop through each process in the list (skip header row)
+        Local $iPID = $aProcessList[$i][1] ; Get the PID
+        If ProcessSetPriority($iPID, $iPriorityConst) Then
+            $iSuccessCount += 1
+        Else
+            $iFailureCount += 1
+            _LogMessage("Failed to set priority for process '" & $sProcessName & "' (PID: " & $iPID & ") (Error: " & @error & ")", "ProcessPriority", 0)
+        EndIf
+    Next
 
-	If $iSuccessCount > 0 Then
-		_LogMessage("Successfully set priority to " & $sPriorityName & " for " & $iSuccessCount & " instance(s) of process '" & $sProcessName & "'.", "ProcessPriority", 1)
-	EndIf
-	If $iFailureCount > 0 Then
-		_LogMessage("Failed to set priority for " & $iFailureCount & " instance(s) of process '" & $sProcessName & "'. See log for details.", "ProcessPriority", 0)
-	EndIf
+    If $iSuccessCount > 0 Then
+        _LogMessage("Successfully set priority to " & $sPriorityName & " for " & $iSuccessCount & " instance(s) of process '" & $sProcessName & "'.", "ProcessPriority", 1)
+    EndIf
+    If $iFailureCount > 0 Then
+        _LogMessage("Failed to set priority for " & $iFailureCount & " instance(s) of process '" & $sProcessName & "'. See log for details.", "ProcessPriority", 0)
+    EndIf
 
-	Local $sMsg = "Priority set to " & $sPriorityName & " for " & $iSuccessCount & " instance(s) of '" & $sProcessName & "'."
-	If $iFailureCount > 0 Then
-		$sMsg &= @CRLF & "Failed to set priority for " & $iFailureCount & " instance(s). Check log for errors."
-	EndIf
-	MsgBox($MB_SYSTEMMODAL, "Process Priority", $sMsg, 1)
+    Local $sMsg = "Priority set to " & $sPriorityName & " for " & $iSuccessCount & " instance(s) of '" & $sProcessName & "'."
+    If $iFailureCount > 0 Then
+        $sMsg &= @CRLF & "Failed to set priority for " & $iFailureCount & " instance(s). Check log for errors."
+    EndIf
+    MsgBox($MB_SYSTEMMODAL, "Process Priority", $sMsg, 1)
 
 EndFunc   ;==>SetProcessPriority
