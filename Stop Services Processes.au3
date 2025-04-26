@@ -15,6 +15,7 @@
 #include <AutoItConstants.au3>
 #include <Misc.au3>
 #include <Date.au3>
+
 Opt("TrayIconDebug", 1) ;0=no info, 1=debug line info
 Opt("WinTitleMatchMode", 2)
 HotKeySet("{ScrollLock}{PAUSE}", "_exit")
@@ -72,7 +73,7 @@ Func ToggleScript() ;handles the toggling on and off of script.  Eventually use 
 			$iLastStopServices = TimerInit() ;Update $iLastStopServices with the current time for future timerdiff checks
 		EndIf
 		Sleep(500)
-		_AdvancedRenamer()
+		_miscpopups
 	WEnd
 EndFunc   ;==>ToggleScript
 
@@ -122,7 +123,7 @@ Func _stopservicescustom() ; Check if a service is running and stop it, then log
 		EndIf
 	Next
 
-	; service manages Windows components, so it requires special handling 
+	; service manages Windows components, so it requires special handling
 	; to ensure it terminates the service correctly.
 	If _ServiceRunning("", "sppsvc") Then
 		$bActionTaken = True
@@ -161,18 +162,22 @@ If $hFile = -1 Then
 EndFunc   ;==>_LogMessage
 
 Func _exit()
-	_LogMessage("Script termination requested", "System", 1)
+	_LogMessage("Script termination requested", "System" & @CRLF, 1)
+	ConsoleWrite("Script termination requested" & @CRLF)
 	_LogMessage("Script Was Terminated by _exit()", "System", 1)
+	ConsoleWrite("Script Was Terminated by _exit" & @CRLF)
 	Exit
 EndFunc   ;==>_exit
 
-Func _AdvancedRenamer() ; monitors if window exists and closes if true
+Func _miscpopups() ; monitors if window exists and closes if true
 	If WinExists("[CLASS:TPleaseRegisterForm]") Then
-		ConsoleWrite("In _AdvancedRenamer function" & @CRLF)
-		ConsoleWrite("Passed check, closing window" & @CRLF)
+		ConsoleWrite("Closing AdVancedRenamer Popup" & @CRLF)
 		WinClose("[CLASS:TPleaseRegisterForm]")
+	ElseIf WinExists("This is an unregistered copy","") Then
+		WinClose("This is an unregistered copy","")
+		ConsoleWrite("Closing Sublime Popup" & @CRLF)
 	EndIf
-EndFunc   ;==>_AdvancedRenamer
+EndFunc
 
 Func CheckElapsedTime($iStartTime, $iInterval)  ;calc of time difference in ms to seconds
 	Return TimerDiff($iStartTime) >= ($iInterval * 1000)

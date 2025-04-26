@@ -9,8 +9,6 @@ This script runs 24/7, periodically terminating processes and services required 
 This AutoIt script is designed to manage and control specific processes and services on a Windows 10 system.
 It handles the unattended closing of processes and stopping of services related to Windows Update & background software installs, logs events to file, and handles specific window events automatically.
 
-This script is written in [AutoIt](https://github.com/autoit), a scripting language designed for automating the Windows GUI and general scripting.
-
 ## Features
 
 - **Hotkey Control**: Use hotkeys to start, pause, and stop the script.
@@ -18,72 +16,110 @@ This script is written in [AutoIt](https://github.com/autoit), a scripting langu
 - **Service Management**: Checks for running services, stops them if necessary, and logs the closure.
 - **Smart Logging**: Only logs when actual actions are taken (process/service closures).
 - **Window Event Handling**: Closes specific windows if they appear.
+- **Process Priority**: Allows setting process priority using a hotkey.
+- **Customizable Logging**: Supports both file and console logging with adjustable log levels.
+- **Icon Customization**: Allows setting a custom tray icon for the script.
 
 ## Hotkeys
 
-- **`{F1}`**: Toggles script between off and on. When toggled on, the script runs continuously, checking and closing processes and services as needed. Each F1 press is logged with its action (starting/pausing).
-- **`{ScrollLock}{PAUSE}`**: Terminates the script immediately.
+- **`Shift & {F1}`**: Toggles script between off and on. When toggled on, the script runs continuously, checking and closing processes and services as needed. Each F1 press is logged with its action (starting/pausing).
+- **`{ScrollLock} & {PAUSE}`**: Terminates the script immediately.
+- **`Shift & 9`**: Opens a dialog to set the priority of a specific process.
 
-## Script Overview
+## Logging
 
-### Globals
+- **Log File**: The script logs events to a file located at `G:\login\closure_log.txt` by default. This can be customized by editing the `Global $sLogFile` variable in the script.
+- **Log Levels**:
+  - `0`: Errors only.
+  - `1`: Basic logging.
+  - `2`: Detailed logging (default).
+- **Console Logging**: Enabled by default. To disable, set `Global $bLogToConsole = False`.
 
-- `$sProcesses`: An array of processes to be closed automatically.
-- `$bScriptRunning`: A flag to track the running state of the script.
-- `$iLastStopServices`: Tracks the last time the `_stopservicescustom()` function was called.
-- `$iLastStopProcesses`: Tracks the last time the `_CloseInstaller()` function was called.
-- `$sLogFile`: The path to the log file where actions are recorded.
-- `$iLogLevel`: Controls the verbosity of logging (0=Errors only, 1=Basic logging, 2=Detailed logging).
-- `$bLogToConsole`: Enables/disables console output alongside file logging.
-- `$iconfile`: The path to the icon displayed in the system tray.
+## Processes and Services Managed
 
-### Main Loop
+### Processes
+The script automatically terminates the following processes:
+- `taskhostw.exe`
+- `TrustedInstaller.exe`
+- `TiWorker.exe`
+- `CompatTelRunner.exe`
+- `VSSVC.exe`
+- `msiexec.exe`
+- `msedge.exe`
+- `helppane.exe`
+- `net.exe`
+- `vmcompute.exe`
+- `msedgewebview2.exe`
 
-The script runs indefinitely, waiting for hotkey inputs to control the flow.
-When activated, it periodically checks for running processes and services, closes them if they exist, and logs the actions taken.
+### Services
+The script stops the following services if they are running:
+- `TrustedInstaller`
+- `wuauserv` (Windows Update)
+- `UsoSvc` (Update Orchestrator Service)
+- `DoSvc` (Delivery Optimization)
+- `WaaSMedicSvc` (Windows Update Medic Service)
+- `sppsvc` (Software Protection Service)
 
-### Functions
-
-- **`ToggleScript()`**: Handles starting and pausing the script. Logs F1 hotkey presses and their actions (starting/pausing).
-- **`_CloseInstaller()`**: Iterates over the `$sProcesses` array, closing each process that is running. Only logs when processes are actually found and closed.
-- **`_stopservicescustom()`**: Checks for specific services, stops them if running. Only logs when services are actually found and stopped. It also handles the `sppsvc` process separately.
-- **`_LogMessage()`**: Enhanced logging function that supports different message types and log levels.
-- **`CheckElapsedTime($iStartTime, $iInterval)`**: Calculates if the specified time interval has passed since the last function call.
-- **`_AdvancedRenamer()`**: Checks for a specific window class and closes it if found.
-- **`_exit()`**: Logs the termination of the script and exits.
+Special handling is implemented for `sppsvc` to ensure proper termination.
 
 ## Setup
 
 1. **Requirements**: Ensure you have [AutoIt](https://github.com/autoit) installed on your system if you want to run the `.au3` source code directly.
 
-2. **Icon**: (Optional) To use a custom icon for the app in your systray edit `Global $iconfile = "G:\Users\mmuel\OneDrive\Documents\AutoIT\ff7.ico"` with the path to your desired tray icon file.
+2. **Icon**: (Optional) To use a custom icon for the app in your systray, edit `Global $iconfile = ""` with the path to your desired tray icon file.
 
-3. **Log File**: Edit `Global $sLogFile = "G:\login\closure_log.txt"` to your preferred log file location.
+3. **Log File**: Edit `Global $sLogFile = ""` to your preferred log file location.
 
 4. **Processes and Services**: (Optional) Customize the `$sProcesses` and `$aServiceNames` arrays to include the processes and services you want to manage.
    When declaring the Global variable `$sProcesses[11]`, `11` must match the number of processes declared.
 
 5. **Logging Configuration**: (Optional)
-   - Adjust `$iLogLevel` (0=Errors only, 1=Basic logging, 2=Detailed logging)
+   - Adjust `$iLogLevel` (0=Errors only, 1=Basic logging, 2=Detailed logging).
    - Set `$bLogToConsole` to `True` or `False` to enable or disable console output.
+
+6. **Hotkey for Process Priority**: Use `Ctrl + 9` to set the priority of all instances of a process by name.
 
 ## Usage
 
 **To run the script, download the executable from [`Releases`](https://github.com/SevWren/Win10-Stop-Services-Processes/releases/tag/Working) and launch it. No AutoIt installation is required to run the .exe!**
 
 1. **DOWNLOAD EXE FROM [`RELEASES`](https://github.com/SevWren/Win10-Stop-Services-Processes/releases/tag/Working)**
-2. Use F1 to toggle the script between stopped/started states (actions are logged)
-3. Check the log file for details about:
-   - F1 hotkey presses (start/pause actions)
-   - Process closures (only when processes are found and closed)
-   - Service stops (only when services are found and stopped)
-4. Hover over the icon in the system tray to see the current script state
+2. Use Shift & F1 to toggle the script between stopped/started states (actions are logged).
+3. Use `Ctrl + 9` to set the priority of a specific process.
+4. Check the log file for details about:
+   - F1 hotkey presses (start/pause actions).
+   - Process closures (only when processes are found and closed).
+   - Service stops (only when services are found and stopped).
+   - Priority changes for processes.
+5. Hover over the icon in the system tray to see the current script state.
 
-## MISC
+## Miscellaneous
 
-⚠️ The `_AdvancedRenamer()` function is specific to my system. This function checks for a specific window class (`TPleaseRegisterForm`) and closes it if found (likely related to an "Advanced Renamer" registration prompt).
+⚠️ The `_miscpopups()` function is specific to the author's system. This function checks for specific window classes (e.g., `TPleaseRegisterForm`) and closes them if found.
 
 To disable this function:
 
-1. Comment out the line `_AdvancedRenamer()` inside the `ToggleScript()` function.
-2. Comment out the `_AdvancedRenamer()` function definition itself.
+1. Comment out the line `_miscpopups()` inside the `ToggleScript()` function.
+2. Comment out the `_miscpopups()` function definition itself.
+
+## Known Limitations
+
+- The script requires administrative privileges to run (`#RequireAdmin` directive).
+- The default paths for the icon and log file are hardcoded and may need to be updated for your system.
+- The script is designed for Windows 10 and may not work as intended on other versions of Windows.
+
+## Changelog
+
+### v0.03
+- **Added**: Hotkey `^9` for setting process priority.
+- **Improved**: Logging system now supports both file and console output.
+- **Enhanced**: Error handling for `sppsvc` service termination.
+- **Updated**: `_miscpopups()` function to handle additional window classes.
+- **Fixed**: Log file initialization to ensure proper directory creation and logging.
+
+### v0.02
+- **Added**: `_AdvancedRenamer()` function to handle specific popups (now replaced by `_miscpopups()`).
+- **Improved**: Timer logic for periodic execution of service and process management functions.
+
+### v0.01
+- **Initial Release**: Basic functionality for stopping services and processes related to Windows Update.
