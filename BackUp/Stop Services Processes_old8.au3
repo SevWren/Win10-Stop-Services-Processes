@@ -11,6 +11,7 @@
 
 ;This is the ServiceControlAu3 library included in the repo
 #include "C:\Users\mmuel\Documents\GitHub\Win10-Stop-Services-Processes\Includes\ServiceControl.au3"
+
 ;Standard AU3 library Locations with AutoIT  Program Files (x86)\AutoIt3\Include
 #include <MsgBoxConstants.au3>
 #include <AutoItConstants.au3>
@@ -196,6 +197,13 @@ Func _LogMessage($sMessage, $sType, $iLevel) ;describe what this achieves
 	EndIf
 EndFunc   ;==>_LogMessage
 
+Func _exit()
+	; FIX: Corrected bug where @CRLF was part of the type string and removed redundant ConsoleWrite
+	_LogMessage("Script termination requested", "System", 1)
+	_LogMessage("Script Was Terminated by _exit()", "System", 1)
+	Exit
+EndFunc   ;==>_exit
+
 Func _miscpopups() ; monitors if window exists and closes if true
 	If WinExists("[CLASS:TPleaseRegisterForm]") Then
 		ConsoleWrite("Closing AdVancedRenamer Popup" & @CRLF)
@@ -288,10 +296,3 @@ Func SetProcessPriority()
 	MsgBox($MB_SYSTEMMODAL, "Process Priority", $sMsg, 1)
 
 EndFunc   ;==>SetProcessPriority
-
-Func _exit()
-	; FIX: Corrected bug where @CRLF was part of the type string and removed redundant ConsoleWrite
-	_LogMessage("Script termination requested", "System", 1)
-	_LogMessage("Script Was Terminated by _exit()", "System", 1)
-	Exit
-EndFunc   ;==>_exit

@@ -8,7 +8,6 @@
 #EndRegion ;**** Directives created by AutoIt3Wrapper_GUI ****
 
 #Region ;Includes/Options/Permissions/Hotkeys
-
 ;This is the ServiceControlAu3 library included in the repo
 #include "C:\Users\mmuel\Documents\GitHub\Win10-Stop-Services-Processes\Includes\ServiceControl.au3"
 ;Standard AU3 library Locations with AutoIT  Program Files (x86)\AutoIt3\Include
@@ -23,48 +22,38 @@ HotKeySet("+{F1}", "ToggleScript") ;hotkey used to toggle on/off of script.
 HotKeySet("+^9", "SetProcessPriority") ;ctrl/shift/9 hotkey for setting all instances of a process's priority
 #EndRegion ;Includes/Options/Permissions/Hotkeys
 
-#Region ;Variables/Logging
+#Region ;Globals
 Global $sStringInstaller = "In the _CloserInstaller function and just terminated"
 Global $taskcloseran = 0
 Global $sProcesses[11] = ["taskhostw.exe", "TrustedInstaller.exe", "TiWorker.exe", "CompatTelRunner.exe", "VSSVC.exe", "msiexec.exe", "msedge.exe", "helppane.exe", "net.exe", "vmcompute.exe", "msedgewebview2.exe"] ;list of processes to always close
 Global $bScriptRunning = False ; Variable to track the script's running state
 Global $iLastStopServices = TimerInit() ;Variable to track the last time _stopservicescustom() was called.
 Global $iLastStopProcesses = TimerInit() ;Variable to track the last time _closeinstaller() was called.
-Global $iconfile = "%HOMEDRIVE%\Users\mmuel\Documents\AutoIT\ff7.ico" ;update with whatever icon file .ico you prefer to use in systray
+Global $iconfile = "%HOMEDRIVE%\Users\mmuel\Documents\AutoIT\ff7.ico";update with whatever icon file .ico you prefer to use in systray
 Global $iLogMaxAgeDays = 7
-Global $sLogFile = @HomeDrive & "\login\closure_log.txt" ; FIX: Using @HomeDrive macro instead of environment variable for better reliability.
+Global $sLogFile = "%HOMEDRIVE%\login\closure_log.txt" ;update with your desired logging output file location - c:\login\closure_log.txt
 Global $iLogLevel = 2 ; 0=Errors only, 1=Basic logging, 2=Detailed logging
 Global $bLogToConsole = True ; Enable console logging alongside file logging
 TraySetIcon($iconfile)
 
-; --- FIX: RESTRUCTURED LOG INITIALIZATION ---
-ConsoleWrite("DEBUG: Starting log initialization." & @CRLF)
-ConsoleWrite("DEBUG: Log file path is: " & $sLogFile & @CRLF)
-
+; Initialize logging
 If Not FileExists($sLogFile) Then
-	ConsoleWrite("DEBUG: Log file does not exist. Attempting to create." & @CRLF)
-	Local $sLogDir = StringRegExpReplace($sLogFile, "\\[^\\]+$", "")
-	DirCreate($sLogDir)
-	If @error Then
-		ConsoleWrite("FATAL ERROR: Could not create directory: " & $sLogDir & " (Error: " & @error & "). Script cannot continue logging." & @CRLF)
-	Else
-		ConsoleWrite("DEBUG: Directory exists or was created. Writing initial log entry directly." & @CRLF)
-		; FIX: Use a direct FileWrite for initialization to avoid the "chicken and egg" paradox.
-		Local $sDateTime = _NowTime(12) & " " & @MDAY & "/" & @MON & "/" & @YEAR
-		Local $sLogEntry = $sDateTime & " [System] Log file initialized"
-		FileWrite($sLogFile, $sLogEntry & @CRLF)
-		If @error Then
-			ConsoleWrite("FATAL ERROR: Could not write initial entry to log file: " & $sLogFile & " (Error: " & @error & "). Check permissions or antivirus." & @CRLF)
-		Else
-			ConsoleWrite("DEBUG: Initial log entry written successfully." & @CRLF)
-		EndIf
-	EndIf
-Else
-	ConsoleWrite("DEBUG: Log file exists. Checking for rotation." & @CRLF)
-	_CheckAndRotateLogFile($sLogFile, $iLogMaxAgeDays)
+	DirCreate(StringRegExpReplace($sLogFile, "\\[^\\]+$", ""))
+	_LogMessage("Log file initialized", "System", 1)
+	ConsoleWrite("Log file initialized" & @CRLF)
 EndIf
-; --- END FIX ---
-#EndRegion ;Variables/Logging
+; Check if log file exists and is too old
+If FileExists($sLogFile) Then
+    Local $aFileTime = FileGetTime($sLogFile, 0, 1) ; Returns [YYYY,MM,DD]
+    If Not @error Then
+        Local $iFileDate = _DateToDayValue($aFileTime[0], $aFileTime[1], $aFileTime[2])
+        Local $iToday = _DateToDayValue(@YEAR, @MON, @MDAY)
+        If $iToday - $iFileDate > $iLogMaxAgeDays Then
+            FileDelete($sLogFile) ; Remove old log
+        EndIf
+    EndIf
+EndIf
+#EndRegion ;Globals
 
 While 1  ;Keeps script running indefinitely.  Hotkeys determine which path the script heads
 	Sleep(50)
@@ -73,12 +62,12 @@ WEnd
 Func ToggleScript() ;handles the toggling on and off of script.  Eventually use this to handle halting the main loop instead.
 	If $bScriptRunning Then
 		_LogMessage("F1 pressed - Pausing script", "System", 1)
-		; ConsoleWrite("F1 pressed - Pausing script" & @CRLF) ; FIX: Removed redundant ConsoleWrite
+		ConsoleWrite("F1 pressed - Pausing script" & @CRLF)
 		MsgBox($MB_SYSTEMMODAL, "AutoIT Script", "Script paused!", 1)
 		$bScriptRunning = False ;this exits this function
 	Else
 		_LogMessage("F1 pressed - Starting script", "System", 1)
-		; ConsoleWrite("F1 pressed - Starting script" & @CRLF) ; FIX: Removed redundant ConsoleWrite
+		ConsoleWrite("F1 pressed - Starting script" & @CRLF)
 		MsgBox($MB_SYSTEMMODAL, "AutoIT Script", "Script started!", 1)
 		$bScriptRunning = True
 	EndIf
@@ -98,23 +87,6 @@ Func ToggleScript() ;handles the toggling on and off of script.  Eventually use 
 	WEnd
 EndFunc   ;==>ToggleScript
 
-Func _CheckAndRotateLogFile($sPath, $iDaysMax)
-	If FileExists($sPath) Then
-		Local $aFileTime = FileGetTime($sPath, 0, 1)
-		If IsArray($aFileTime) Then
-			Local $iFileDate = _DateToDayValue($aFileTime[0], $aFileTime[1], $aFileTime[2])
-			Local $iToday = _DateToDayValue(@YEAR, @MON, @MDAY)
-			If $iToday - $iFileDate > $iDaysMax Then
-				ConsoleWrite("DEBUG: Log file is older than " & $iDaysMax & " days. Deleting." & @CRLF)
-				FileDelete($sPath)
-				If @error Then
-					ConsoleWrite("ERROR: Failed to delete old log file. (Error: " & @error & ")" & @CRLF)
-				EndIf
-			EndIf
-		EndIf
-	EndIf
-EndFunc   ;==>_CheckAndRotateLogFile
-
 Func _CloseInstaller() ; Handles closing of all the processes stored in the $sProcesses array
 	Local $iSuccess = 0, $iFailure = 0, $bActionTaken = False
 
@@ -125,15 +97,18 @@ Func _CloseInstaller() ; Handles closing of all the processes stored in the $sPr
 			If $iResult = 1 Then
 				$iSuccess += 1
 				_LogMessage("Successfully closed process: " & $sProcesses[$i], "Process", 1)
+				ConsoleWrite("Successfully closed process: " & $sProcesses[$i] & @CRLF)
 			Else
 				$iFailure += 1
 				_LogMessage("Failed to close process: " & $sProcesses[$i] & " (Error: " & @error & ")", "Process", 0)
+				ConsoleWrite("Failed to close process: " & $sProcesses[$i] & " (Error: " & @error & ")" & @CRLF)
 			EndIf
 		EndIf
 	Next
 
 	If $bActionTaken Then
 		_LogMessage("Process closure summary - Success: " & $iSuccess & ", Failed: " & $iFailure, "Process", 1)
+		ConsoleWrite("Process closure summary - Success: " & $iSuccess & ", Failed: " & $iFailure & @CRLF)
 	EndIf
 EndFunc   ;==>_CloseInstaller
 
@@ -149,9 +124,11 @@ Func _stopservicescustom() ; Check if a service is running and stop it, then log
 			If $iResult = 1 Then
 				$iSuccess += 1
 				_LogMessage("Successfully stopped service: " & $aServiceNames[$i], "Service", 1)
+				ConsoleWrite("Successfully stopped service: " & $aServiceNames[$i] & @CRLF)
 			Else
 				$iFailure += 1
 				_LogMessage("Failed to stop service: " & $aServiceNames[$i] & " (Error: " & @error & ")", "Service", 0)
+				ConsoleWrite("Failed to stop service: " & $aServiceNames[$i] & " (Error: " & @error & ")" & @CRLF)
 			EndIf
 		EndIf
 	Next
@@ -179,32 +156,38 @@ Func _LogMessage($sMessage, $sType, $iLevel) ;describe what this achieves
 	If $iLevel > $iLogLevel Then Return ; Skip if message level is higher than current log level
 	Local $sDateTime = _NowTime(12) & " " & @MDAY & "/" & @MON & "/" & @YEAR
 	Local $sLogEntry = @CRLF & $sDateTime & " [" & $sType & "] " & $sMessage
+	Local $hFile = FileOpen($sLogFile, 1) ; Attempt to write to log file
 
-	; FIX: Added robust error checking for FileOpen
-	Local $hFile = FileOpen($sLogFile, 1) ; Mode 1 = Append (write-only)
-	If $hFile = -1 Then
-		; DEBUG: This will now tell us exactly why it failed.
-		ConsoleWrite("ERROR in _LogMessage: Could not open log file '" & $sLogFile & "' for writing. @error code = " & @error & @CRLF)
+If $hFile = -1 Then
+		ConsoleWrite("Error: Could not open log file for writing" & @CRLF)
 		Return
 	EndIf
 
 	FileWrite($hFile, $sLogEntry)
 	FileClose($hFile)
 
-	If $bLogToConsole Then     ; Console output if enabled
+	If $bLogToConsole Then 	; Console output if enabled
 		ConsoleWrite($sLogEntry & @CRLF)
 	EndIf
 EndFunc   ;==>_LogMessage
+
+Func _exit()
+	_LogMessage("Script termination requested", "System" & @CRLF, 1)
+	ConsoleWrite("Script termination requested" & @CRLF)
+	_LogMessage("Script Was Terminated by _exit()", "System", 1)
+	ConsoleWrite("Script Was Terminated by _exit" & @CRLF)
+	Exit
+EndFunc   ;==>_exit
 
 Func _miscpopups() ; monitors if window exists and closes if true
 	If WinExists("[CLASS:TPleaseRegisterForm]") Then
 		ConsoleWrite("Closing AdVancedRenamer Popup" & @CRLF)
 		WinClose("[CLASS:TPleaseRegisterForm]")
-	ElseIf WinExists("This is an unregistered copy", "") Then
-		WinClose("This is an unregistered copy", "")
+	ElseIf WinExists("This is an unregistered copy","") Then
+		WinClose("This is an unregistered copy","")
 		ConsoleWrite("Closing Sublime Popup" & @CRLF)
 	EndIf
-EndFunc   ;==>_miscpopups
+EndFunc
 
 Func CheckElapsedTime($iStartTime, $iInterval)  ;calc of time difference in ms to seconds
 	Return TimerDiff($iStartTime) >= ($iInterval * 1000)
@@ -241,6 +224,7 @@ Func SetProcessPriority()
 		Case Else
 			; Log an error message for invalid input
 			_LogMessage("Invalid priority level entered: " & $sPriorityLevel, "ProcessPriority", 0)
+			ConsoleWrite("Invalid priority level entered: " & $sPriorityLevel & @CRLF)
 			MsgBox($MB_SYSTEMMODAL, "Process Priority", "Invalid priority level. Please enter 1, 2, or 3.", 1)
 			Return ; Exit if invalid input
 	EndSwitch
@@ -288,10 +272,3 @@ Func SetProcessPriority()
 	MsgBox($MB_SYSTEMMODAL, "Process Priority", $sMsg, 1)
 
 EndFunc   ;==>SetProcessPriority
-
-Func _exit()
-	; FIX: Corrected bug where @CRLF was part of the type string and removed redundant ConsoleWrite
-	_LogMessage("Script termination requested", "System", 1)
-	_LogMessage("Script Was Terminated by _exit()", "System", 1)
-	Exit
-EndFunc   ;==>_exit

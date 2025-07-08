@@ -1,0 +1,20 @@
+
+4:05:45 PM 08/07/2025 [System] Log file initialized
+4:05:59 PM 08/07/2025 [System] F1 pressed - Starting script
+4:06:00 PM 08/07/2025 [Service] Successfully stopped service: UsoSvc
+4:06:00 PM 08/07/2025 [Service] Service stop summary - Success: 1, Failed: 0
+4:07:12 PM 08/07/2025 [ProcessPriority] Process priority setting cancelled by user (Process Name Input)
+4:12:24 PM 08/07/2025 [System] F1 pressed - Starting script
+4:19:41 PM 08/07/2025 [System
+] Script termination requested
+4:19:41 PM 08/07/2025 [System] Script Was Terminated by _exit()
+4:25:52 PM 08/07/2025 [System] F1 pressed - Starting script
+4:43:26 PM 08/07/2025 [System] F1 pressed - Pausing script
+4:43:28 PM 08/07/2025 [System] F1 pressed - Starting script
+4:46:38 PM 08/07/2025 [System
+] Script termination requested
+4:46:38 PM 08/07/2025 [System] Script Was Terminated by _exit()
+4:46:45 PM 08/07/2025 [System] F1 pressed - Starting script
+4:49:42 PM 08/07/2025 [System
+] Script termination requested
+4:49:42 PM 08/07/2025 [System] Script Was Terminated by _exit()
