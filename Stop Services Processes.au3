@@ -43,15 +43,14 @@ ConsoleWrite("DEBUG: Log file path is: " & $sLogFile & @CRLF)
 
 If Not FileExists($sLogFile) Then
 	ConsoleWrite("DEBUG: Log file does not exist. Attempting to create." & @CRLF)
-	Local $sLogDir = StringRegExpReplace($sLogFile, "\\[^\\]+$", "")
+	Dim $sLogDir = StringRegExpReplace($sLogFile, "\\[^\\]+$", "") ;<-- FIXED
 	DirCreate($sLogDir)
 	If @error Then
 		ConsoleWrite("FATAL ERROR: Could not create directory: " & $sLogDir & " (Error: " & @error & "). Script cannot continue logging." & @CRLF)
 	Else
 		ConsoleWrite("DEBUG: Directory exists or was created. Writing initial log entry directly." & @CRLF)
-		; FIX: Use a direct FileWrite for initialization to avoid the "chicken and egg" paradox.
-		Local $sDateTime = _NowTime(12) & " " & @MDAY & "/" & @MON & "/" & @YEAR
-		Local $sLogEntry = $sDateTime & " [System] Log file initialized"
+		Dim $sDateTime = _NowTime(12) & " " & @MDAY & "/" & @MON & "/" & @YEAR ;<-- FIXED
+		Dim $sLogEntry = $sDateTime & " [System] Log file initialized" ;<-- FIXED
 		FileWrite($sLogFile, $sLogEntry & @CRLF)
 		If @error Then
 			ConsoleWrite("FATAL ERROR: Could not write initial entry to log file: " & $sLogFile & " (Error: " & @error & "). Check permissions or antivirus." & @CRLF)
@@ -63,7 +62,7 @@ Else
 	ConsoleWrite("DEBUG: Log file exists. Checking for rotation." & @CRLF)
 	_CheckAndRotateLogFile($sLogFile, $iLogMaxAgeDays)
 EndIf
-; --- END FIX ---
+
 #EndRegion ;Variables/Logging
 
 While 1  ;Keeps script running indefinitely.  Hotkeys determine which path the script heads
