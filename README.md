@@ -2,7 +2,8 @@
 
 # Stop Services Processes
 
-This script runs 24/7, periodically terminating processes and services required for Windows Update to download & install automatically. The script also terminates certain common installers. It is designed to be a "set it and forget it" tool for managing system behavior.
+This script is designed to run 24/7, periodically terminating processes and stopping services required for Windows Update to download & install automatically. The script also terminates certain common installers. 
+It is designed to be a "set it and forget it" tool for managing irregular system behavior resulting from Automatically initiated attempts to modify Window's files against Microsoft's "Database".
 
 ## Features
 
@@ -44,6 +45,8 @@ The script automatically terminates the following processes:
 - `net.exe`
 - `vmcompute.exe`
 - `msedgewebview2.exe`
+- `UserOOBEBroker.exe`
+- `TCPSVCS.EXE`
 
 ### Services
 The script stops the following services if they are running:
@@ -100,15 +103,3 @@ To disable this function:
 - **Refactor**: Replaced `Local` with `Dim` for variables in the global scope to eliminate all AU3Check compiler warnings.
 - **Refactor**: Removed redundant `ConsoleWrite` calls to streamline logging and prevent duplicate output.
 - **Docs**: Updated README with corrected hotkeys (`Shift+Ctrl+9`), log paths, and a detailed new changelog entry.
-
-### v0.03
-- **Added**: Hotkey for setting process priority.
-- **Improved**: Logging system now supports both file and console output.
-- **Enhanced**: Error handling for `sppsvc` service termination.
-
-### v0.02
-- **Added**: Functionality to handle specific popups.
-- **Improved**: Timer logic for periodic execution of service and process management functions.
-
-### v0.01
-- **Initial Release**: Basic functionality for stopping services and processes related to Windows Update.
