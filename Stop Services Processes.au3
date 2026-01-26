@@ -1,11 +1,14 @@
 #RequireAdmin
 #Region ;**** Directives created by AutoIt3Wrapper_GUI ****
+#AutoIt3Wrapper_Icon=ff7.ico
+#AutoIt3Wrapper_Outfile_x64=..\..\..\Users\mmuel\Desktop\Stop Services - Processes Test dllhost.Exe
 #AutoIt3Wrapper_Compression=0
 #AutoIt3Wrapper_Res_Description=Script monitors processes and services related to windows update and terminates if running.
+#AutoIt3Wrapper_Res_Icon_Add=C:\github\my-github-info\Win10-Stop-Services-Processes\ff7.ico
 #AutoIt3Wrapper_Add_Constants=n
 #AutoIt3Wrapper_AU3Check_Parameters=-q -d -w 1 -w 2 -w 3 -w 4
-#AutoIt3Wrapper_ShowProgress=Y
 #EndRegion ;**** Directives created by AutoIt3Wrapper_GUI ****
+#AutoIt3Wrapper_ShowProgress=Y
 
 #Region ;Includes/Options/Permissions/Hotkeys
 
@@ -26,7 +29,7 @@ HotKeySet("+^9", "SetProcessPriority") ;ctrl/shift/9 hotkey for setting all inst
 #Region ;Variables/Logging
 Global $sStringInstaller = "In the _CloserInstaller function and just terminated"
 Global $taskcloseran = 0
-Global $sProcesses[11] = ["taskhostw.exe", "TrustedInstaller.exe", "TiWorker.exe", "CompatTelRunner.exe", "VSSVC.exe", "msiexec.exe", "msedge.exe", "helppane.exe", "net.exe", "vmcompute.exe", "msedgewebview2.exe"] ;list of processes to always close
+Global $sProcesses[14] = ["taskhostw.exe", "TrustedInstaller.exe", "TiWorker.exe", "CompatTelRunner.exe", "VSSVC.exe", "msiexec.exe", "msedge.exe", "helppane.exe", "net.exe", "vmcompute.exe", "msedgewebview2.exe", "update.exe", "AggregatorHost.exe", "dllhost.exe"] ;list of processes to always close
 Global $bScriptRunning = False ; Variable to track the script's running state
 Global $iLastStopServices = TimerInit() ;Variable to track the last time _stopservicescustom() was called.
 Global $iLastStopProcesses = TimerInit() ;Variable to track the last time _closeinstaller() was called.

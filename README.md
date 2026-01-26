@@ -35,22 +35,25 @@ It is designed to be a "set it and forget it" tool for managing irregular system
 ### Processes
 The script automatically terminates the following processes:
 - `taskhostw.exe`
-- `TrustedInstaller.exe`
 - `TiWorker.exe`
 - `CompatTelRunner.exe`
 - `VSSVC.exe`
 - `msiexec.exe`
-- `msedge.exe`
-- `helppane.exe`
 - `net.exe`
 - `vmcompute.exe`
-- `msedgewebview2.exe`
+- `msedge.exe` - To fight against force ms-edge usage
+- `helppane.exe` - To fight against force ms-edge usage
+- `msedgewebview2.exe` - To fight against force ms-edge usage
+- `AggregatorHost.exe`
+- `dllhost.exe`
 - `UserOOBEBroker.exe`
 - `TCPSVCS.EXE`
+- `TrustedInstaller.exe` - To Prevent Automated Software Installs (Applies to mal-ware prevention)
+- `update.exe` - To Prevent Automated Software Installs (Applies to mal-ware prevention)
 
 ### Services
 The script stops the following services if they are running:
-- `TrustedInstaller`
+- `TrustedInstaller` - To Prevent Automated Software Installs (Applies to mal-ware prevention)
 - `wuauserv` (Windows Update)
 - `UsoSvc` (Update Orchestrator Service)
 - `DoSvc` (Delivery Optimization)
