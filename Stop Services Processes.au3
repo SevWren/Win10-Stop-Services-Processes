@@ -1,11 +1,10 @@
 #RequireAdmin
 #Region ;**** Directives created by AutoIt3Wrapper_GUI ****
 #AutoIt3Wrapper_Icon=ff7.ico
-#AutoIt3Wrapper_Outfile_x64=..\..\..\Users\mmuel\Desktop\Stop Services - Processes Test dllhost.Exe
+#AutoIt3Wrapper_Outfile_x64=..\..\..\Users\mmuel\Desktop\Stop Services - Processes.Exe
 #AutoIt3Wrapper_Compression=0
 #AutoIt3Wrapper_Res_Description=Script monitors processes and services related to windows update and terminates if running.
 #AutoIt3Wrapper_Res_Icon_Add=C:\github\my-github-info\Win10-Stop-Services-Processes\ff7.ico
-#AutoIt3Wrapper_Add_Constants=n
 #AutoIt3Wrapper_AU3Check_Parameters=-q -d -w 1 -w 2 -w 3 -w 4
 #EndRegion ;**** Directives created by AutoIt3Wrapper_GUI ****
 #AutoIt3Wrapper_ShowProgress=Y
@@ -13,31 +12,39 @@
 #Region ;Includes/Options/Permissions/Hotkeys
 
 ;This is the ServiceControlAu3 library included in the repo
-#include "C:\Users\mmuel\Documents\GitHub\Win10-Stop-Services-Processes\Includes\ServiceControl.au3"
+#include "C:\github\my-github-info\Win10-Stop-Services-Processes\Includes\ServiceControl.au3"
 ;Standard AU3 library Locations with AutoIT  Program Files (x86)\AutoIt3\Include
 #include <MsgBoxConstants.au3>
 #include <AutoItConstants.au3>
 #include <Misc.au3>
 #include <Date.au3>
+#include <WinAPI.au3>       ; _WinAPI_OpenProcess, _WinAPI_CloseHandle
+#include <WinAPIProc.au3>   ; _WinAPI_GetPriorityClass, WinAPI priority class constants
+#include <Array.au3>        ; _ArrayAdd, _ArrayDelete
 Opt("TrayIconDebug", 1) ;0=no info, 1=debug line info
 Opt("WinTitleMatchMode", 2)
 HotKeySet("{ScrollLock}{PAUSE}", "_exit")
 HotKeySet("+{F1}", "ToggleScript") ;hotkey used to toggle on/off of script.
-HotKeySet("+^9", "SetProcessPriority") ;ctrl/shift/9 hotkey for setting all instances of a process's priority
+HotKeySet("+^9", "SetProcessPriority")  ; ctrl+shift+9 — set priority for all instances of a named process
+HotKeySet("^!+9", "LockProcessPriority") ; ctrl+alt+shift+9 — lock a specific PID's priority and auto-restore on drift
 #EndRegion ;Includes/Options/Permissions/Hotkeys
 
 #Region ;Variables/Logging
 Global $sStringInstaller = "In the _CloserInstaller function and just terminated"
 Global $taskcloseran = 0
-Global $sProcesses[14] = ["taskhostw.exe", "TrustedInstaller.exe", "TiWorker.exe", "CompatTelRunner.exe", "VSSVC.exe", "msiexec.exe", "msedge.exe", "helppane.exe", "net.exe", "vmcompute.exe", "msedgewebview2.exe", "update.exe", "AggregatorHost.exe", "dllhost.exe"] ;list of processes to always close
-Global $bScriptRunning = False ; Variable to track the script's running state
+Global $sProcesses[18] = ["taskhostw.exe", "TrustedInstaller.exe", "TiWorker.exe", "CompatTelRunner.exe", "VSSVC.exe", "msiexec.exe", "msedge.exe", "helppane.exe", "net.exe", "vmcompute.exe", "msedgewebview2.exe", "update.exe", "AggregatorHost.exe", "dllhost.exe", "TCPSVCS.EXE", "xgamehelper.exe", "xgamehelper.exe", "backgroundTaskHost.exe"] ;  list of processes to always close
+Global $bScriptRunning = False ;Variable to track the script's running state
 Global $iLastStopServices = TimerInit() ;Variable to track the last time _stopservicescustom() was called.
 Global $iLastStopProcesses = TimerInit() ;Variable to track the last time _closeinstaller() was called.
 Global $iconfile = "%HOMEDRIVE%\Users\mmuel\Documents\AutoIT\ff7.ico" ;update with whatever icon file .ico you prefer to use in systray
 Global $iLogMaxAgeDays = 7
 Global $sLogFile = @HomeDrive & "\login\closure_log.txt" ; FIX: Using @HomeDrive macro instead of environment variable for better reliability.
-Global $iLogLevel = 2 ; 0=Errors only, 1=Basic logging, 2=Detailed logging
-Global $bLogToConsole = True ; Enable console logging alongside file logging
+Global $iLogLevel = 2 ;0=Error,1=Info,2=Verbose
+Global $bLogToConsole = True ; logtofile
+Global Const $PROCESS_IDLE = 0   ; ProcessSetPriority: Idle — not defined in this AutoIt version's AutoItConstants.au3
+Global $aPriorityWatchPIDs[0]    ; PIDs currently under priority watchdog
+Global $aPriorityWatchTargets[0] ; Corresponding target AutoIt priority constants (0-5)
+Global $aPriorityWatchNames[0]   ; Corresponding human-readable priority names
 TraySetIcon($iconfile)
 
 ; --- FIX: RESTRUCTURED LOG INITIALIZATION ---
@@ -290,6 +297,235 @@ Func SetProcessPriority()
 	MsgBox($MB_SYSTEMMODAL, "Process Priority", $sMsg, 1)
 
 EndFunc   ;==>SetProcessPriority
+
+Func LockProcessPriority()
+	; --- Step 1: Collect and validate PID ---
+	Local $sRawPID = InputBox("Priority Watchdog", "Enter the Process ID (PID) to monitor:" & @CRLF & @CRLF & "Must be a positive integer of a currently running process.")
+	If @error Then
+		_LogMessage("LockProcessPriority: Cancelled by user at PID prompt.", "PriorityWatchdog", 1)
+		Return
+	EndIf
+
+	If Not StringIsDigit($sRawPID) Or Number($sRawPID) <= 0 Then
+		_TrayNotify("Invalid PID. Must be a positive whole number.")
+		_LogMessage("LockProcessPriority: Invalid PID entered: '" & $sRawPID & "'", "PriorityWatchdog", 0)
+		Return
+	EndIf
+
+	Local $iPID = Int($sRawPID)
+
+	If Not ProcessExists($iPID) Then
+		_TrayNotify("PID " & $iPID & " does not exist.")
+		_LogMessage("LockProcessPriority: PID " & $iPID & " does not exist.", "PriorityWatchdog", 0)
+		Return
+	EndIf
+
+	; Reject duplicate — each PID may only appear once in the watchlist
+	For $i = 0 To UBound($aPriorityWatchPIDs) - 1
+		If $aPriorityWatchPIDs[$i] = $iPID Then
+			_TrayNotify("PID " & $iPID & " is already being monitored.")
+			_LogMessage("LockProcessPriority: PID " & $iPID & " is already in the watchlist.", "PriorityWatchdog", 1)
+			Return
+		EndIf
+	Next
+
+	; --- Step 2: Collect and validate priority ---
+	Local $sPriorityPrompt = "Select target priority for PID " & $iPID & ":" & @CRLF & @CRLF & _
+			"0 = Idle" & @CRLF & _
+			"1 = Below Normal" & @CRLF & _
+			"2 = Normal" & @CRLF & _
+			"3 = Above Normal" & @CRLF & _
+			"4 = High" & @CRLF & _
+			"5 = Real-time  (use with extreme caution)"
+
+	Local $sRawPriority = InputBox("Priority Watchdog", $sPriorityPrompt, "2")
+	If @error Then
+		_LogMessage("LockProcessPriority: Cancelled by user at priority prompt for PID " & $iPID & ".", "PriorityWatchdog", 1)
+		Return
+	EndIf
+
+	If Not StringIsDigit($sRawPriority) Then
+		_TrayNotify("Invalid input. Enter a number from 0 to 5.")
+		_LogMessage("LockProcessPriority: Non-numeric priority input '" & $sRawPriority & "' for PID " & $iPID & ".", "PriorityWatchdog", 0)
+		Return
+	EndIf
+
+	Local $iPriorityConst = Int($sRawPriority)
+	If $iPriorityConst < 0 Or $iPriorityConst > 5 Then
+		_TrayNotify("Priority must be 0 through 5.")
+		_LogMessage("LockProcessPriority: Priority out of range: " & $iPriorityConst & " for PID " & $iPID & ".", "PriorityWatchdog", 0)
+		Return
+	EndIf
+
+	Local $sPriorityName = _PriorityConstantToName($iPriorityConst)
+
+	; --- Step 3: TOCTOU re-check then apply priority immediately ---
+	If Not ProcessExists($iPID) Then
+		_TrayNotify("PID " & $iPID & " exited before priority could be set.")
+		_LogMessage("LockProcessPriority: PID " & $iPID & " exited between input and initial set.", "PriorityWatchdog", 1)
+		Return
+	EndIf
+
+	If Not ProcessSetPriority($iPID, $iPriorityConst) Then
+		_TrayNotify("Failed to set priority for PID " & $iPID & ". See log.")
+		_LogMessage("LockProcessPriority: ProcessSetPriority failed for PID " & $iPID & " (Error: " & @error & ")", "PriorityWatchdog", 0)
+		Return
+	EndIf
+
+	; --- Step 4: Add to watchlist and register adlib if this is the first entry ---
+	Local $bWasEmpty = (UBound($aPriorityWatchPIDs) = 0)
+	_ArrayAdd($aPriorityWatchPIDs, $iPID)
+	_ArrayAdd($aPriorityWatchTargets, $iPriorityConst)
+	_ArrayAdd($aPriorityWatchNames, $sPriorityName)
+
+	If $bWasEmpty Then AdlibRegister("_PriorityWatchdog", 10000)
+
+	_TrayNotify("Watching PID " & $iPID & " -> " & $sPriorityName)
+	_LogMessage("LockProcessPriority: Watchdog started — PID " & $iPID & " → " & $sPriorityName & " (" & UBound($aPriorityWatchPIDs) & " PID(s) now monitored)", "PriorityWatchdog", 1)
+
+EndFunc   ;==>LockProcessPriority
+
+Func _PriorityWatchdog()
+	; Iterate backwards so _ArrayDelete does not shift unprocessed indices
+	For $i = UBound($aPriorityWatchPIDs) - 1 To 0 Step -1
+		Local $iPID          = $aPriorityWatchPIDs[$i]
+		Local $iPriorityConst = $aPriorityWatchTargets[$i]
+		Local $sPriorityName  = $aPriorityWatchNames[$i]
+
+		; Check process existence first
+		If Not ProcessExists($iPID) Then
+			_ArrayDelete($aPriorityWatchPIDs, $i)
+			_ArrayDelete($aPriorityWatchTargets, $i)
+			_ArrayDelete($aPriorityWatchNames, $i)
+			_TrayNotify("PID " & $iPID & " exited - watchdog stopped.")
+			_LogMessage("_PriorityWatchdog: PID " & $iPID & " no longer exists. Removed from watchlist (" & UBound($aPriorityWatchPIDs) & " PID(s) remaining)", "PriorityWatchdog", 1)
+			ContinueLoop
+		EndIf
+
+		; Read current priority via WinAPI
+		Local $iCurrentConst = _GetProcessPriorityByPID($iPID)
+		If $iCurrentConst = -1 Then
+			; Could not read priority this tick — log and defer until next tick
+			_LogMessage("_PriorityWatchdog: Could not read priority for PID " & $iPID & ". Deferring check to next tick.", "PriorityWatchdog", 0)
+			ContinueLoop
+		EndIf
+
+		; Check for drift
+		If $iCurrentConst <> $iPriorityConst Then
+			Local $sCurrentName = _PriorityConstantToName($iCurrentConst)
+			_LogMessage("_PriorityWatchdog: Priority drift on PID " & $iPID & " — detected " & $sCurrentName & ", expected " & $sPriorityName & ". Restoring.", "PriorityWatchdog", 1)
+
+			; TOCTOU re-check before restore attempt
+			If Not ProcessExists($iPID) Then
+				_ArrayDelete($aPriorityWatchPIDs, $i)
+				_ArrayDelete($aPriorityWatchTargets, $i)
+				_ArrayDelete($aPriorityWatchNames, $i)
+				_TrayNotify("PID " & $iPID & " exited - watchdog stopped.")
+				_LogMessage("_PriorityWatchdog: PID " & $iPID & " exited between drift detection and restore attempt.", "PriorityWatchdog", 1)
+				ContinueLoop
+			EndIf
+
+			If ProcessSetPriority($iPID, $iPriorityConst) Then
+				_TrayNotify("PID " & $iPID & " restored to " & $sPriorityName)
+				_LogMessage("_PriorityWatchdog: Successfully restored PID " & $iPID & " → " & $sPriorityName, "PriorityWatchdog", 1)
+			Else
+				_LogMessage("_PriorityWatchdog: ProcessSetPriority failed on restore for PID " & $iPID & " (Error: " & @error & ")", "PriorityWatchdog", 0)
+			EndIf
+		EndIf
+
+	Next
+
+	; Unregister when watchlist is empty
+	If UBound($aPriorityWatchPIDs) = 0 Then
+		AdlibUnRegister("_PriorityWatchdog")
+		_LogMessage("_PriorityWatchdog: Watchlist empty. AdlibRegister unregistered.", "PriorityWatchdog", 1)
+	EndIf
+
+EndFunc   ;==>_PriorityWatchdog
+
+Func _GetProcessPriorityByPID($iPID)
+	; Returns the current AutoIt priority constant (0-5) for the given PID.
+	; Returns -1 on any failure.
+	; Uses DllCall directly — bypasses _WinAPI_GetPriorityClass wrapper which propagates
+	; unreliable @error values. PROCESS_QUERY_LIMITED_INFORMATION (0x1000) is sufficient
+	; for GetPriorityClass and is granted by more process types than PROCESS_QUERY_INFORMATION.
+	Local Const $PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+
+	; Open process handle
+	Local $aOpen = DllCall("kernel32.dll", "handle", "OpenProcess", "dword", $PROCESS_QUERY_LIMITED_INFORMATION, "bool", False, "dword", $iPID)
+	If @error Or Not $aOpen[0] Then
+		Local $iOpenWinErr = _WinAPI_GetLastError()
+		_LogMessage("_GetProcessPriorityByPID: OpenProcess failed for PID " & $iPID & " (DllError: " & @error & ", WinError: " & $iOpenWinErr & ")", "PriorityWatchdog", 0)
+		Return -1
+	EndIf
+
+	; Read priority class — capture @error and GetLastError before CloseHandle clears them
+	Local $aResult    = DllCall("kernel32.dll", "dword", "GetPriorityClass", "handle", $aOpen[0])
+	Local $iDllError  = @error
+	Local $iWinError  = _WinAPI_GetLastError()
+	DllCall("kernel32.dll", "bool", "CloseHandle", "handle", $aOpen[0])
+
+	If $iDllError Or Not $aResult[0] Then
+		_LogMessage("_GetProcessPriorityByPID: GetPriorityClass failed for PID " & $iPID & " (DllError: " & $iDllError & ", WinError: " & $iWinError & ")", "PriorityWatchdog", 0)
+		Return -1
+	EndIf
+
+	Return _WinAPIPriorityClassToAutoItConst($aResult[0])
+
+EndFunc   ;==>_GetProcessPriorityByPID
+
+Func _WinAPIPriorityClassToAutoItConst($iWinAPIClass)
+	; Maps Windows API PRIORITY_CLASS values to AutoIt ProcessSetPriority constants.
+	; These are entirely different numbering schemes — this mapping is mandatory.
+	Switch $iWinAPIClass
+		Case $IDLE_PRIORITY_CLASS          ; 0x00000040
+			Return $PROCESS_IDLE           ; 0
+		Case $BELOW_NORMAL_PRIORITY_CLASS  ; 0x00004000
+			Return $PROCESS_BELOWNORMAL    ; 1
+		Case $NORMAL_PRIORITY_CLASS        ; 0x00000020
+			Return $PROCESS_NORMAL         ; 2
+		Case $ABOVE_NORMAL_PRIORITY_CLASS  ; 0x00008000
+			Return $PROCESS_ABOVENORMAL    ; 3
+		Case $HIGH_PRIORITY_CLASS          ; 0x00000080
+			Return $PROCESS_HIGH           ; 4
+		Case $REALTIME_PRIORITY_CLASS      ; 0x00000100
+			Return $PROCESS_REALTIME       ; 5
+		Case Else
+			Return -1 ; Unrecognised priority class
+	EndSwitch
+EndFunc   ;==>_WinAPIPriorityClassToAutoItConst
+
+Func _PriorityConstantToName($iPriorityConst)
+	; Maps AutoIt ProcessSetPriority constants to human-readable strings.
+	Switch $iPriorityConst
+		Case $PROCESS_IDLE
+			Return "Idle"
+		Case $PROCESS_BELOWNORMAL
+			Return "Below Normal"
+		Case $PROCESS_NORMAL
+			Return "Normal"
+		Case $PROCESS_ABOVENORMAL
+			Return "Above Normal"
+		Case $PROCESS_HIGH
+			Return "High"
+		Case $PROCESS_REALTIME
+			Return "Real-time"
+		Case Else
+			Return "Unknown (" & $iPriorityConst & ")"
+	EndSwitch
+EndFunc   ;==>_PriorityConstantToName
+
+Func _TrayNotify($sMessage)
+	; ToolTip produces a tiny native tooltip — no toast, no Action Center, no sound.
+	; Positioned bottom-right near the system tray. Auto-clears after 3 seconds.
+	ToolTip("[Priority Watchdog]" & @CRLF & $sMessage, @DesktopWidth - 260, @DesktopHeight - 80)
+	AdlibRegister("_ClearTrayNotify", 3000)
+EndFunc   ;==>_TrayNotify
+
+Func _ClearTrayNotify()
+	ToolTip("")
+	AdlibUnRegister("_ClearTrayNotify")
+EndFunc   ;==>_ClearTrayNotify
 
 Func _exit()
 	; FIX: Corrected bug where @CRLF was part of the type string and removed redundant ConsoleWrite
