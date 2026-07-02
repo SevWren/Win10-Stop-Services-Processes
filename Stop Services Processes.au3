@@ -23,10 +23,15 @@
 #include <WinAPI.au3>       ; _WinAPI_OpenProcess, _WinAPI_CloseHandle
 #include <WinAPIProc.au3>   ; _WinAPI_GetPriorityClass, WinAPI priority class constants
 #include <Array.au3>        ; _ArrayAdd, _ArrayDelete
+#include <WinAPI.au3>       ; _WinAPI_OpenProcess, _WinAPI_CloseHandle
+#include <WinAPIProc.au3>   ; _WinAPI_GetPriorityClass, WinAPI priority class constants
+#include <Array.au3>        ; _ArrayAdd, _ArrayDelete
 Opt("TrayIconDebug", 1)
 Opt("WinTitleMatchMode", 2)
 HotKeySet("{ScrollLock}{PAUSE}", "_exit")
 HotKeySet("+{F1}", "ToggleScript") ;hotkey used to toggle on/off of script.
+HotKeySet("+^9", "SetProcessPriority")  ; ctrl+shift+9 — set priority for all instances of a named process
+HotKeySet("^!+9", "LockProcessPriority") ; ctrl+alt+shift+9 — lock a specific PID's priority and auto-restore on drift
 HotKeySet("+^9", "SetProcessPriority")  ; ctrl+shift+9 — set priority for all instances of a named process
 HotKeySet("^!+9", "LockProcessPriority") ; ctrl+alt+shift+9 — lock a specific PID's priority and auto-restore on drift
 #EndRegion ;Includes/Options/Permissions/Hotkeys
@@ -36,11 +41,19 @@ Global $sStringInstaller = "In the _CloserInstaller function and just terminated
 Global $taskcloseran = 0
 Global $sProcesses[18] = ["taskhostw.exe", "TrustedInstaller.exe", "TiWorker.exe", "CompatTelRunner.exe", "VSSVC.exe", "msiexec.exe", "msedge.exe", "helppane.exe", "net.exe", "vmcompute.exe", "msedgewebview2.exe", "update.exe", "AggregatorHost.exe", "dllhost.exe", "TCPSVCS.EXE", "xgamehelper.exe", "xgamehelper.exe", "backgroundTaskHost.exe"] ;  list of processes to always close
 Global $bScriptRunning = False ;Variable to track the script's running state
+Global $sProcesses[18] = ["taskhostw.exe", "TrustedInstaller.exe", "TiWorker.exe", "CompatTelRunner.exe", "VSSVC.exe", "msiexec.exe", "msedge.exe", "helppane.exe", "net.exe", "vmcompute.exe", "msedgewebview2.exe", "update.exe", "AggregatorHost.exe", "dllhost.exe", "TCPSVCS.EXE", "xgamehelper.exe", "xgamehelper.exe", "backgroundTaskHost.exe"] ;  list of processes to always close
+Global $bScriptRunning = False ;Variable to track the script's running state
 Global $iLastStopServices = TimerInit() ;Variable to track the last time _stopservicescustom() was called.
 Global $iLastStopProcesses = TimerInit() ;Variable to track the last time _closeinstaller() was called.
 Global $iconfile = "%HOMEDRIVE%\Users\mmuel\Documents\AutoIT\ff7.ico" ;update with whatever icon file .ico you prefer to use in systray
 Global $iLogMaxAgeDays = 7
 Global $sLogFile = @HomeDrive & "\login\closure_log.txt" ; FIX: Using @HomeDrive macro instead of environment variable for better reliability.
+Global $iLogLevel = 2 ;0=Error,1=Info,2=Verbose
+Global $bLogToConsole = True ; logtofile
+Global Const $PROCESS_IDLE = 0   ; ProcessSetPriority: Idle — not defined in this AutoIt version's AutoItConstants.au3
+Global $aPriorityWatchPIDs[0]    ; PIDs currently under priority watchdog
+Global $aPriorityWatchTargets[0] ; Corresponding target AutoIt priority constants (0-5)
+Global $aPriorityWatchNames[0]   ; Corresponding human-readable priority names
 Global $iLogLevel = 2 ;0=Error,1=Info,2=Verbose
 Global $bLogToConsole = True ; logtofile
 Global Const $PROCESS_IDLE = 0   ; ProcessSetPriority: Idle — not defined in this AutoIt version's AutoItConstants.au3
