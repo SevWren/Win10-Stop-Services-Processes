@@ -11,41 +11,46 @@
 #EndRegion ;**** Directives created by AutoIt3Wrapper_GUI ****
 #AutoIt3Wrapper_ShowProgress=Y
 
-#Region ;Includes/Options/Permissions/Hotkeys
+;~ Global $iLastStopProcesses
 
+#Region ;Includes/Options/Permissions
 ;This is the ServiceControlAu3 library included in the repo
-#include "C:\github\my-github-info\Win10-Stop-Services-Processes\Includes\ServiceControl.au3"
+
 ;Autoit AU3 library Location `Program Files (x86)\AutoIt3\Include`
+#include "C:\github\my-github-info\Win10-Stop-Services-Processes\Includes\ServiceControl.au3"
 #include <MsgBoxConstants.au3>
 #include <AutoItConstants.au3>
 #include <Misc.au3>
 #include <Date.au3>
-#include <WinAPI.au3>       ; _WinAPI_OpenProcess, _WinAPI_CloseHandle
-#include <WinAPIProc.au3>   ; _WinAPI_GetPriorityClass, WinAPI priority class constants
-#include <Array.au3>        ; _ArrayAdd, _ArrayDelete
-#include <WinAPI.au3>       ; _WinAPI_OpenProcess, _WinAPI_CloseHandle
-#include <WinAPIProc.au3>   ; _WinAPI_GetPriorityClass, WinAPI priority class constants
-#include <Array.au3>        ; _ArrayAdd, _ArrayDelete
+#include <WinAPI.au3> ; _WinAPI_OpenProcess, _WinAPI_CloseHandle
+#include <WinAPIProc.au3> ; _WinAPI_GetPriorityClass, WinAPI priority class constants
+#include <Array.au3> ; _ArrayAdd, _ArrayDelete
+#include <WinAPI.au3> ; _WinAPI_OpenProcess, _WinAPI_CloseHandle
+#include <WinAPIProc.au3> ; _WinAPI_GetPriorityClass, WinAPI priority class constants
+#include <Array.au3> ; _ArrayAdd, _ArrayDelete
 Opt("TrayIconDebug", 1)
 Opt("WinTitleMatchMode", 2)
+#EndRegion ;Includes/Options/Permissions/Hotkeys
+
+#Region ;hotkeys
 HotKeySet("{ScrollLock}{PAUSE}", "_exit")
 HotKeySet("+{F1}", "ToggleScript") ;hotkey used to toggle on/off of script.
 HotKeySet("+^9", "SetProcessPriority")  ; ctrl+shift+9 — set priority for all instances of a named process
 HotKeySet("^!+9", "LockProcessPriority") ; ctrl+alt+shift+9 — lock a specific PID's priority and auto-restore on drift
 HotKeySet("+^9", "SetProcessPriority")  ; ctrl+shift+9 — set priority for all instances of a named process
 HotKeySet("^!+9", "LockProcessPriority") ; ctrl+alt+shift+9 — lock a specific PID's priority and auto-restore on drift
-#EndRegion ;Includes/Options/Permissions/Hotkeys
+#EndRegion
+
 
 #Region ;Variables/Logging
 Global $sStringInstaller = "In the _CloserInstaller function and just terminated"
 Global $taskcloseran = 0
 Global $sProcesses[18] = ["taskhostw.exe", "TrustedInstaller.exe", "TiWorker.exe", "CompatTelRunner.exe", "VSSVC.exe", "msiexec.exe", "msedge.exe", "helppane.exe", "net.exe", "vmcompute.exe", "msedgewebview2.exe", "update.exe", "AggregatorHost.exe", "dllhost.exe", "TCPSVCS.EXE", "xgamehelper.exe", "xgamehelper.exe", "backgroundTaskHost.exe"] ;  list of processes to always close
 Global $bScriptRunning = False ;Variable to track the script's running state
-Global $sProcesses[18] = ["taskhostw.exe", "TrustedInstaller.exe", "TiWorker.exe", "CompatTelRunner.exe", "VSSVC.exe", "msiexec.exe", "msedge.exe", "helppane.exe", "net.exe", "vmcompute.exe", "msedgewebview2.exe", "update.exe", "AggregatorHost.exe", "dllhost.exe", "TCPSVCS.EXE", "xgamehelper.exe", "xgamehelper.exe", "backgroundTaskHost.exe"] ;  list of processes to always close
-Global $bScriptRunning = False ;Variable to track the script's running state
 Global $iLastStopServices = TimerInit() ;Variable to track the last time _stopservicescustom() was called.
-Global $iLastStopProcesses = TimerInit() ;Variable to track the last time _closeinstaller() was called.
-Global $iconfile = "%HOMEDRIVE%\Users\mmuel\Documents\AutoIT\ff7.ico" ;update with whatever icon file .ico you prefer to use in systray
+;~ Global $iconfile = "%HOMEDRIVE%\Users\mmuel\Documents\AutoIT\ff7.ico" ;update with whatever icon file .ico you prefer to use in systray
+Global $iconfile = @ScriptDir & "\ff7.ico" ;debugging weird pathing issue
+
 Global $iLogMaxAgeDays = 7
 Global $sLogFile = @HomeDrive & "\login\closure_log.txt" ; FIX: Using @HomeDrive macro instead of environment variable for better reliability.
 Global $iLogLevel = 2 ;0=Error,1=Info,2=Verbose
@@ -54,15 +59,8 @@ Global Const $PROCESS_IDLE = 0   ; ProcessSetPriority: Idle — not defined in t
 Global $aPriorityWatchPIDs[0]    ; PIDs currently under priority watchdog
 Global $aPriorityWatchTargets[0] ; Corresponding target AutoIt priority constants (0-5)
 Global $aPriorityWatchNames[0]   ; Corresponding human-readable priority names
-Global $iLogLevel = 2 ;0=Error,1=Info,2=Verbose
-Global $bLogToConsole = True ; logtofile
-Global Const $PROCESS_IDLE = 0   ; ProcessSetPriority: Idle — not defined in this AutoIt version's AutoItConstants.au3
-Global $aPriorityWatchPIDs[0]    ; PIDs currently under priority watchdog
-Global $aPriorityWatchTargets[0] ; Corresponding target AutoIt priority constants (0-5)
-Global $aPriorityWatchNames[0]   ; Corresponding human-readable priority names
+;~ Global $bLogToConsole = True ; logtofile
 TraySetIcon($iconfile)
-
-; --- FIX: RESTRUCTURED LOG INITIALIZATION ---
 ConsoleWrite("DEBUG: Starting log initialization." & @CRLF)
 ConsoleWrite("DEBUG: Log file path is: " & $sLogFile & @CRLF)
 
@@ -90,19 +88,19 @@ EndIf
 
 #EndRegion ;Variables/Logging
 
-While 1  ;Keeps script running indefinitely.  Hotkeys determine which path the script heads
+While 1  ;Main loop - Keeps script running indefinitely.  Hotkeys drive the modes
 	Sleep(50)
 WEnd
 
 Func ToggleScript() ;handles the toggling on and off of script.  Eventually use this to handle halting the main loop instead.
 	If $bScriptRunning Then
 		_LogMessage("F1 pressed - Pausing script", "System", 1)
-		; ConsoleWrite("F1 pressed - Pausing script" & @CRLF) ; FIX: Removed redundant ConsoleWrite
+		; ConsoleWrite("F1 pressed - Pausing script" & @CRLF)
 		MsgBox($MB_SYSTEMMODAL, "AutoIT Script", "Script paused!", 1)
 		$bScriptRunning = False ;this exits this function
 	Else
 		_LogMessage("F1 pressed - Starting script", "System", 1)
-		; ConsoleWrite("F1 pressed - Starting script" & @CRLF) ; FIX: Removed redundant ConsoleWrite
+		; ConsoleWrite("F1 pressed - Starting script" & @CRLF)
 		MsgBox($MB_SYSTEMMODAL, "AutoIT Script", "Script started!", 1)
 		$bScriptRunning = True
 	EndIf
@@ -219,16 +217,6 @@ Func _LogMessage($sMessage, $sType, $iLevel) ;describe what this achieves
 		ConsoleWrite($sLogEntry & @CRLF)
 	EndIf
 EndFunc   ;==>_LogMessage
-
-Func _miscpopups() ; monitors if window exists and closes if true
-	If WinExists("[CLASS:TPleaseRegisterForm]") Then
-		ConsoleWrite("Closing AdVancedRenamer Popup" & @CRLF)
-		WinClose("[CLASS:TPleaseRegisterForm]")
-	ElseIf WinExists("This is an unregistered copy", "") Then
-		WinClose("This is an unregistered copy", "")
-		ConsoleWrite("Closing Sublime Popup" & @CRLF)
-	EndIf
-EndFunc   ;==>_miscpopups
 
 Func CheckElapsedTime($iStartTime, $iInterval)  ;calc of time difference in ms to seconds
 	Return TimerDiff($iStartTime) >= ($iInterval * 1000)
@@ -403,9 +391,9 @@ EndFunc   ;==>LockProcessPriority
 Func _PriorityWatchdog()
 	; Iterate backwards so _ArrayDelete does not shift unprocessed indices
 	For $i = UBound($aPriorityWatchPIDs) - 1 To 0 Step -1
-		Local $iPID          = $aPriorityWatchPIDs[$i]
+		Local $iPID = $aPriorityWatchPIDs[$i]
 		Local $iPriorityConst = $aPriorityWatchTargets[$i]
-		Local $sPriorityName  = $aPriorityWatchNames[$i]
+		Local $sPriorityName = $aPriorityWatchNames[$i]
 
 		; Check process existence first
 		If Not ProcessExists($iPID) Then
@@ -475,9 +463,9 @@ Func _GetProcessPriorityByPID($iPID)
 	EndIf
 
 	; Read priority class — capture @error and GetLastError before CloseHandle clears them
-	Local $aResult    = DllCall("kernel32.dll", "dword", "GetPriorityClass", "handle", $aOpen[0])
-	Local $iDllError  = @error
-	Local $iWinError  = _WinAPI_GetLastError()
+	Local $aResult = DllCall("kernel32.dll", "dword", "GetPriorityClass", "handle", $aOpen[0])
+	Local $iDllError = @error
+	Local $iWinError = _WinAPI_GetLastError()
 	DllCall("kernel32.dll", "bool", "CloseHandle", "handle", $aOpen[0])
 
 	If $iDllError Or Not $aResult[0] Then
@@ -530,6 +518,7 @@ Func _PriorityConstantToName($iPriorityConst)
 	EndSwitch
 EndFunc   ;==>_PriorityConstantToName
 
+#Region ;traytips
 Func _TrayNotify($sMessage)
 	; ToolTip produces a tiny native tooltip. Positioned bottom-right near the system tray. Auto-clears after 2 seconds.
 	ToolTip("[Priority Watchdog]" & @CRLF & $sMessage, @DesktopWidth - 260, @DesktopHeight - 80)
@@ -540,6 +529,17 @@ Func _ClearTrayNotify()
 	ToolTip("")
 	AdlibUnRegister("_ClearTrayNotify")
 EndFunc   ;==>_ClearTrayNotify
+#EndRegion
+
+Func _miscpopups() ; Misc popup annoyances - window exists then close window
+	If WinExists("[CLASS:TPleaseRegisterForm]") Then
+		ConsoleWrite("Closing AdVancedRenamer Popup" & @CRLF)
+		WinClose("[CLASS:TPleaseRegisterForm]")
+	ElseIf WinExists("This is an unregistered copy", "") Then ;mainly sublime text
+		WinClose("This is an unregistered copy", "")
+		ConsoleWrite("Closing Sublime Popup" & @CRLF)
+	EndIf
+EndFunc   ;==>_miscpopups
 
 Func _exit()
 	; FIX: Corrected bug where @CRLF was part of the type string and removed redundant ConsoleWrite

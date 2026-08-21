@@ -1,2 +1,9 @@
 .vscode
 (Actively Updating)   Win10-Stop-Services-Processes.code-workspace
+%HOMEDRIVE%
+BackUp/
+digest.txt
+*.txt
+*.old
+*.bak
+*.back
