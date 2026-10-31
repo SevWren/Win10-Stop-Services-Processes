@@ -7,3 +7,6 @@ digest.txt
 *.old
 *.bak
 *.back
+gh_app_token.py
+sevwrenai.private-key.pem
+Stop Services Processes.au3.old
