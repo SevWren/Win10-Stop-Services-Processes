@@ -13,7 +13,7 @@
 
 #Region ;Includes/Options/Permissions
 ; This project must use the script's working directory instead of a fixed local path.
-#include-once
+;~ #include-once
 #include "Includes\ServiceControl.au3"
 #include <MsgBoxConstants.au3>
 #include <AutoItConstants.au3>
