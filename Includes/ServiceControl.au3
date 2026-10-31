@@ -54,6 +54,15 @@ Global $SERVICE_CONTROL_HARDWAREPROFILECHANGE = 0x0000000C
 Global $SERVICE_CONTROL_POWEREVENT = 0x0000000D
 Global $SERVICE_CONTROL_SESSIONCHANGE = 0x0000000E
 
+; Service states
+Global $SERVICE_STOPPED = 0x00000001
+Global $SERVICE_START_PENDING = 0x00000002
+Global $SERVICE_STOP_PENDING = 0x00000003
+Global $SERVICE_RUNNING = 0x00000004
+Global $SERVICE_CONTINUE_PENDING = 0x00000005
+Global $SERVICE_PAUSE_PENDING = 0x00000006
+Global $SERVICE_PAUSED = 0x00000007
+
 ; Service types
 Global $SERVICE_KERNEL_DRIVER = 0x00000001
 Global $SERVICE_FILE_SYSTEM_DRIVER = 0x00000002
@@ -248,41 +257,45 @@ EndFunc   ;==>_ServiceExists
 ; Requirements:  None
 ; Return Values: On Success - 1
 ;                On Failure - 0
-; Note:          This function relies on the fact that only a running service responds
-;                to a SERVICE_CONTROL_INTERROGATE control code. Check the ControlService
-;                page on MSDN for limitations with using this method.
+; Note:          This uses QueryServiceStatus instead of sending an interrogate request,
+;                which is the correct API for determining a service's current state.
 ;===============================================================================
 Func _ServiceRunning($sComputerName, $sServiceName)
-	Local $hAdvapi32
-	Local $arRet
-	Local $hSC
-	Local $hService
-	Local $bRunning = 0
-
-	$hAdvapi32 = DllOpen("advapi32.dll")
+	Local $hAdvapi32 = DllOpen("advapi32.dll")
 	If $hAdvapi32 = -1 Then Return 0
-	$arRet = DllCall($hAdvapi32, "long", "OpenSCManager", _
-			"str", $sComputerName, _
-			"str", "ServicesActive", _
-			"long", $SC_MANAGER_CONNECT)
-	If $arRet[0] <> 0 Then
-		$hSC = $arRet[0]
-		$arRet = DllCall($hAdvapi32, "long", "OpenService", _
-				"long", $hSC, _
-				"str", $sServiceName, _
-				"long", $SERVICE_INTERROGATE)
-		If $arRet[0] <> 0 Then
-			$hService = $arRet[0]
-			$arRet = DllCall($hAdvapi32, "int", "ControlService", _
-					"long", $hService, _
-					"long", $SERVICE_CONTROL_INTERROGATE, _
-					"str", "")
-			$bRunning = $arRet[0]
-			DllCall($hAdvapi32, "int", "CloseServiceHandle", "long", $hService)
-		EndIf
-		DllCall($hAdvapi32, "int", "CloseServiceHandle", "long", $hSC)
+
+	Local $aSCM = DllCall($hAdvapi32, "handle", "OpenSCManager", _
+		"str", $sComputerName, _
+		"str", "ServicesActive", _
+		"dword", $SC_MANAGER_CONNECT)
+	If @error Or Not $aSCM[0] Then
+		DllClose($hAdvapi32)
+		Return 0
 	EndIf
+
+	Local $aService = DllCall($hAdvapi32, "handle", "OpenService", _
+		"handle", $aSCM[0], _
+		"str", $sServiceName, _
+		"dword", $SERVICE_QUERY_STATUS)
+	If @error Or Not $aService[0] Then
+		DllCall($hAdvapi32, "bool", "CloseServiceHandle", "handle", $aSCM[0])
+		DllClose($hAdvapi32)
+		Return 0
+	EndIf
+
+	Local $tStatus = DllStructCreate("dword;dword;dword;dword;dword;dword;dword")
+	Local $aStatus = DllCall($hAdvapi32, "bool", "QueryServiceStatus", _
+		"handle", $aService[0], _
+		"ptr", DllStructGetPtr($tStatus))
+	Local $bRunning = False
+	If Not @error And $aStatus[0] Then
+		$bRunning = (DllStructGetData($tStatus, 2) = $SERVICE_RUNNING)
+	EndIf
+
+	DllCall($hAdvapi32, "bool", "CloseServiceHandle", "handle", $aService[0])
+	DllCall($hAdvapi32, "bool", "CloseServiceHandle", "handle", $aSCM[0])
 	DllClose($hAdvapi32)
+
 	Return $bRunning
 EndFunc   ;==>_ServiceRunning
 
