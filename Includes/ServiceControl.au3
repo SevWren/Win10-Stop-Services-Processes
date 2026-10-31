@@ -184,10 +184,11 @@ Func _StopService($sComputerName, $sServiceName)
 			$lError = $arRet[0]
 		Else
 			$hService = $arRet[0]
+			Local $tStatus = DllStructCreate("dword;dword;dword;dword;dword;dword;dword")
 			$arRet = DllCall($hAdvapi32, "int", "ControlService", _
 					"long", $hService, _
 					"long", $SERVICE_CONTROL_STOP, _
-					"str", "")
+					"ptr", DllStructGetPtr($tStatus))
 			If $arRet[0] = 0 Then
 				$arRet = DllCall($hKernel32, "long", "GetLastError")
 				$lError = $arRet[0]
@@ -246,11 +247,11 @@ EndFunc   ;==>_ServiceExists
 ; Parameters:    $sComputerName - name of the target computer. If empty, the local computer name is used
 ;                $sServiceName - name of the service to check
 ; Requirements:  None
-; Return Values: On Success - 1
-;                On Failure - 0
-; Note:          This function relies on the fact that only a running service responds
-;                to a SERVICE_CONTROL_INTERROGATE control code. Check the ControlService
-;                page on MSDN for limitations with using this method.
+; Return Values: On Success - 1 (service is in SERVICE_RUNNING state)
+;                On Failure - 0 (service is stopped, paused, disabled, or not found)
+; Note:          Uses QueryServiceStatus to read state directly from the SCM.
+;                SERVICE_CONTROL_INTERROGATE was unreliable — services such as LanmanServer
+;                and stisvc do not respond to it even when running, producing false negatives.
 ;===============================================================================
 Func _ServiceRunning($sComputerName, $sServiceName)
 	Local $hAdvapi32
@@ -270,14 +271,16 @@ Func _ServiceRunning($sComputerName, $sServiceName)
 		$arRet = DllCall($hAdvapi32, "long", "OpenService", _
 				"long", $hSC, _
 				"str", $sServiceName, _
-				"long", $SERVICE_INTERROGATE)
+				"long", $SERVICE_QUERY_STATUS)
 		If $arRet[0] <> 0 Then
 			$hService = $arRet[0]
-			$arRet = DllCall($hAdvapi32, "int", "ControlService", _
+			Local $tStatus = DllStructCreate("dword;dword;dword;dword;dword;dword;dword")
+			$arRet = DllCall($hAdvapi32, "int", "QueryServiceStatus", _
 					"long", $hService, _
-					"long", $SERVICE_CONTROL_INTERROGATE, _
-					"str", "")
-			$bRunning = $arRet[0]
+					"ptr", DllStructGetPtr($tStatus))
+			If $arRet[0] <> 0 Then
+				If DllStructGetData($tStatus, 2) = 4 Then $bRunning = 1 ; SERVICE_RUNNING = 4
+			EndIf
 			DllCall($hAdvapi32, "int", "CloseServiceHandle", "long", $hService)
 		EndIf
 		DllCall($hAdvapi32, "int", "CloseServiceHandle", "long", $hSC)
