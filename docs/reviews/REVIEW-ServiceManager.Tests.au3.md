@@ -8,7 +8,7 @@ Branch: arch/service-manager-migration
 
 ---
 
-## Standards Axis
+## Standards
 
 ### Findings
 
@@ -81,7 +81,7 @@ One BLOCKER identified: duplicate `Global Const` definitions for the 12 `$SM_STA
 
 ---
 
-## Spec Axis
+## Spec
 
 ### Findings
 
@@ -177,3 +177,7 @@ The test harness is well-structured, correctly deterministic, and provides compl
 **Required before merge**: Remove the duplicate `Global Const` declarations for `$SM_STATE_*` and `$SM_OUTCOME_*` from lines 36–49 of `Tests/ServiceManager.Tests.au3`. The `$ERR_*` constants (lines 52–59) are not duplicated in `ServiceManager.au3` and must be retained.
 
 No spec deficiencies. No naming or structural violations beyond the constant conflict.
+
+---
+
+**Summary:** 1 Standards finding (1 hard, 0 judgement call) plus 1 INFORMATIONAL note; 0 Spec findings; worst Standards issue: BLOCKER — duplicate `Global Const` declarations for `$SM_STATE_*`/`$SM_OUTCOME_*` will cause AU3Check redefinition errors under the project's required flags; worst Spec issue: none (all requirements satisfied).

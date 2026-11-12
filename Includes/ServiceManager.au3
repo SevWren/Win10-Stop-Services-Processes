@@ -83,6 +83,32 @@ Global Const $SM_SERVICE_QUERY_AND_STOP = BitOR($SM_SERVICE_QUERY_STATUS, $SM_SE
 Global Const $SM_SERVICE_CONTROL_STOP   = 0x00000001
 
 ; ---------------------------------------------------------------------------
+; Stop-eligible states
+; Documentation-only: lists the stop-eligible states in human-readable form.
+; Runtime eligibility is checked in _SM_IsStopEligible() via integer Switch.
+; Ref: DM-01 Stop-Eligible State; DM-09 Change 4; GLOSSARY.md "Stop-Eligible State"
+; ---------------------------------------------------------------------------
+Global Const $SM_STOP_ELIGIBLE_STATES = "RUNNING,PAUSED,PAUSE_PENDING,CONTINUE_PENDING"
+
+; ---------------------------------------------------------------------------
+; Log level constants
+; Match the _LogMessage $iLevel semantics documented in CLAUDE.md and DM-07.
+; 0 = Error (failure events)
+; 1 = Info  (completed-action / suppression events)
+; 2 = Verbose (expected-negative observations, e.g. already stopped)
+; ---------------------------------------------------------------------------
+Global Const $LOG_LEVEL_ERROR   = 0
+Global Const $LOG_LEVEL_INFO    = 1
+Global Const $LOG_LEVEL_VERBOSE = 2
+
+; ---------------------------------------------------------------------------
+; Log type constants
+; String tags for the $sType parameter of _LogMessage. DM-07 §2.2.
+; ---------------------------------------------------------------------------
+Global Const $LOG_TYPE_SYSTEM   = "System"
+Global Const $LOG_TYPE_SERVICE  = "Service"
+
+; ---------------------------------------------------------------------------
 ; Func _SM_StopServicesBatch
 ;
 ; Opens the Windows SCM once, queries each named service, issues stop controls
@@ -131,6 +157,12 @@ Func _SM_StopServicesBatch(ByRef $aServiceNames, $iBatchTimeoutMs = 20000, $iPol
     Next
 
     ; --- Open SCM (batch-level handle) ---
+    ; SCM Handle vs Service Handle distinction (DM-09 Change 5; GLOSSARY.md "SCM Handle"):
+    ;   $hSCM  — SCM Handle, opened ONCE for the entire batch with SC_MANAGER_CONNECT.
+    ;            Lifetime: this function call. Closed after all per-service handles are closed.
+    ;   $hService — Service Handle, opened per-service with SERVICE_QUERY_STATUS|SERVICE_STOP.
+    ;               Lifetime: one service within the batch (Phase 1 routing through Phase 2 poll).
+    ; A failure here is a batch-level failure: no per-service work can proceed.
     ; Ref: https://learn.microsoft.com/en-us/windows/win32/api/winsvc/nf-winsvc-openscmanagerw
     ; lpMachineName = NULL (ptr 0) → local computer
     ; lpDatabaseName = "ServicesActive" → active services database
@@ -142,9 +174,12 @@ Func _SM_StopServicesBatch(ByRef $aServiceNames, $iBatchTimeoutMs = 20000, $iPol
     Local $iScmDllErr = @error    ; capture IMMEDIATELY — @error is volatile
     If $iScmDllErr Or Not $aScmOpen[0] Then
         Local $iScmWinErr = _WinAPI_GetLastError()
-        _LogMessage("_SM_StopServicesBatch: OpenSCManagerW failed (DllErr=" & $iScmDllErr & ", Win32=" & $iScmWinErr & ")", "Service", 0)
+        _LogMessage("_SM_StopServicesBatch: OpenSCManagerW failed (DllErr=" & $iScmDllErr & ", Win32=" & $iScmWinErr & ")", $LOG_TYPE_SERVICE, $LOG_LEVEL_ERROR)
+        ; Architecture contract: @error=1 → "batch-level failure; returned array has 0 rows"
+        ; Return a zero-row array — NOT the pre-allocated $aResults (CR-02 MAJOR fix).
+        Local $aEmpty[0][6]
         SetError(1)
-        Return $aResults
+        Return $aEmpty
     EndIf
     Local $hSCM = $aScmOpen[0]
 
@@ -158,6 +193,10 @@ Func _SM_StopServicesBatch(ByRef $aServiceNames, $iBatchTimeoutMs = 20000, $iPol
     ; =========================================================================
     For $i = 0 To $iCount - 1
         Local $sName = $aServiceNames[$i]
+        ; $iPendLen declared once per loop iteration; assigned (not re-declared) in both
+        ; pending-append branches below — eliminates the duplicate ReDim block and the
+        ; opaque $iPendLen2 name (CR-02 Duplicated Code / Mysterious Name fix).
+        Local $iPendLen
 
         ; Open service with query + stop rights
         ; Ref: https://learn.microsoft.com/en-us/windows/win32/api/winsvc/nf-winsvc-openservicew
@@ -171,11 +210,11 @@ Func _SM_StopServicesBatch(ByRef $aServiceNames, $iBatchTimeoutMs = 20000, $iPol
             If $iSvcWinErr = $SM_ERR_SVC_NOT_EXIST Then
                 $aResults[$i][3] = $SM_OUTCOME_UNAVAILABLE
                 $aResults[$i][4] = $SM_ERR_SVC_NOT_EXIST
-                _LogMessage("_SM_StopServicesBatch: service not found: " & $sName, "Service", 2)
+                _LogMessage("_SM_StopServicesBatch: service not found: " & $sName, $LOG_TYPE_SERVICE, $LOG_LEVEL_VERBOSE)
             Else
                 $aResults[$i][3] = $SM_OUTCOME_FAILED
                 $aResults[$i][4] = $iSvcWinErr
-                _LogMessage("_SM_StopServicesBatch: OpenServiceW failed for " & $sName & " (Win32=" & $iSvcWinErr & ")", "Service", 0)
+                _LogMessage("_SM_StopServicesBatch: OpenServiceW failed for " & $sName & " (Win32=" & $iSvcWinErr & ")", $LOG_TYPE_SERVICE, $LOG_LEVEL_ERROR)
             EndIf
             ContinueLoop   ; do not close a handle that was never opened
         EndIf
@@ -194,7 +233,7 @@ Func _SM_StopServicesBatch(ByRef $aServiceNames, $iBatchTimeoutMs = 20000, $iPol
         If $iQryDllErr Or Not $aQuery[0] Then
             $aResults[$i][3] = $SM_OUTCOME_FAILED
             $aResults[$i][4] = $iQryWinErr
-            _LogMessage("_SM_StopServicesBatch: QueryServiceStatus failed for " & $sName & " (Win32=" & $iQryWinErr & ")", "Service", 0)
+            _LogMessage("_SM_StopServicesBatch: QueryServiceStatus failed for " & $sName & " (Win32=" & $iQryWinErr & ")", $LOG_TYPE_SERVICE, $LOG_LEVEL_ERROR)
             DllCall("advapi32.dll", "bool", "CloseServiceHandle", "handle", $hService)
             ContinueLoop
         EndIf
@@ -207,14 +246,14 @@ Func _SM_StopServicesBatch(ByRef $aServiceNames, $iBatchTimeoutMs = 20000, $iPol
             $aResults[$i][2] = $iInitState
             $aResults[$i][3] = $SM_OUTCOME_ALREADY
             $aResults[$i][4] = 0
-            _LogMessage("_SM_StopServicesBatch: already stopped: " & $sName, "Service", 2)
+            _LogMessage("_SM_StopServicesBatch: already stopped: " & $sName, $LOG_TYPE_SERVICE, $LOG_LEVEL_VERBOSE)
             DllCall("advapi32.dll", "bool", "CloseServiceHandle", "handle", $hService)
             ContinueLoop
         EndIf
 
         If _SM_StateNeedsPolling($iInitState) Then
             ; Service is in STOP_PENDING — just add to pending list and poll
-            Local $iPendLen = UBound($aPendingIdx)
+            $iPendLen = UBound($aPendingIdx)
             ReDim $aPendingIdx[$iPendLen + 1]
             ReDim $aPendingHnd[$iPendLen + 1]
             $aPendingIdx[$iPendLen] = $i
@@ -228,7 +267,7 @@ Func _SM_StopServicesBatch(ByRef $aServiceNames, $iBatchTimeoutMs = 20000, $iPol
             $aResults[$i][3] = $SM_OUTCOME_FAILED
             $aResults[$i][4] = $SM_ERR_CANNOT_ACCEPT
             $aResults[$i][5] = "Service in START_PENDING state; stop control not accepted"
-            _LogMessage("_SM_StopServicesBatch: service in un-stoppable state: " & $sName & " (state=" & $iInitState & ")", "Service", 0)
+            _LogMessage("_SM_StopServicesBatch: service in un-stoppable state: " & $sName & " (state=" & $iInitState & ")", $LOG_TYPE_SERVICE, $LOG_LEVEL_ERROR)
             DllCall("advapi32.dll", "bool", "CloseServiceHandle", "handle", $hService)
             ContinueLoop
         EndIf
@@ -251,20 +290,21 @@ Func _SM_StopServicesBatch(ByRef $aServiceNames, $iBatchTimeoutMs = 20000, $iPol
             $aResults[$i][3] = $sCtrlOutcome
             $aResults[$i][4] = $iCtrlWinErr
             If $sCtrlOutcome = $SM_OUTCOME_ALREADY Then
-                _LogMessage("_SM_StopServicesBatch: service not active (Win32=1062): " & $sName, "Service", 2)
+                _LogMessage("_SM_StopServicesBatch: service not active (Win32=1062): " & $sName, $LOG_TYPE_SERVICE, $LOG_LEVEL_VERBOSE)
             Else
-                _LogMessage("_SM_StopServicesBatch: ControlService failed for " & $sName & " (Win32=" & $iCtrlWinErr & ")", "Service", 0)
+                _LogMessage("_SM_StopServicesBatch: ControlService failed for " & $sName & " (Win32=" & $iCtrlWinErr & ")", $LOG_TYPE_SERVICE, $LOG_LEVEL_ERROR)
             EndIf
             DllCall("advapi32.dll", "bool", "CloseServiceHandle", "handle", $hService)
             ContinueLoop
         EndIf
 
         ; Stop control accepted — add to pending list for polling
-        Local $iPendLen2 = UBound($aPendingIdx)
-        ReDim $aPendingIdx[$iPendLen2 + 1]
-        ReDim $aPendingHnd[$iPendLen2 + 1]
-        $aPendingIdx[$iPendLen2] = $i
-        $aPendingHnd[$iPendLen2] = $hService
+        ; (same ReDim append pattern as the STOP_PENDING branch above — $iPendLen reused)
+        $iPendLen = UBound($aPendingIdx)
+        ReDim $aPendingIdx[$iPendLen + 1]
+        ReDim $aPendingHnd[$iPendLen + 1]
+        $aPendingIdx[$iPendLen] = $i
+        $aPendingHnd[$iPendLen] = $hService
 
     Next   ;==>Phase 1 loop
 
@@ -288,7 +328,7 @@ Func _SM_StopServicesBatch(ByRef $aServiceNames, $iBatchTimeoutMs = 20000, $iPol
             Local $iPollDllErr = @error    ; capture IMMEDIATELY
             If $iPollDllErr Or Not $aPoll[0] Then
                 ; Cannot read status this tick — defer (leave in pending list)
-                _LogMessage("_SM_StopServicesBatch: poll query failed for " & $aResults[$iResultIdx][0] & " — deferring", "Service", 0)
+                _LogMessage("_SM_StopServicesBatch: poll query failed for " & $aResults[$iResultIdx][0] & " — deferring", $LOG_TYPE_SERVICE, $LOG_LEVEL_ERROR)
                 ContinueLoop
             EndIf
 
@@ -299,7 +339,7 @@ Func _SM_StopServicesBatch(ByRef $aServiceNames, $iBatchTimeoutMs = 20000, $iPol
                 ; Service reached STOPPED state
                 $aResults[$iResultIdx][3] = $SM_OUTCOME_STOPPED
                 $aResults[$iResultIdx][4] = 0
-                _LogMessage("_SM_StopServicesBatch: service stopped: " & $aResults[$iResultIdx][0], "Service", 1)
+                _LogMessage("_SM_StopServicesBatch: service stopped: " & $aResults[$iResultIdx][0], $LOG_TYPE_SERVICE, $LOG_LEVEL_INFO)
                 DllCall("advapi32.dll", "bool", "CloseServiceHandle", "handle", $hPendSvc)
                 ; Remove from pending arrays (shrink from the end)
                 Local $iPendCount = UBound($aPendingIdx)
@@ -327,7 +367,7 @@ Func _SM_StopServicesBatch(ByRef $aServiceNames, $iBatchTimeoutMs = 20000, $iPol
         $aResults[$iTOIdx][3] = $SM_OUTCOME_TIMEDOUT
         $aResults[$iTOIdx][4] = 0
         $aResults[$iTOIdx][5] = "Deadline exceeded (" & $iBatchTimeoutMs & "ms)"
-        _LogMessage("_SM_StopServicesBatch: stop timed out: " & $aResults[$iTOIdx][0], "Service", 0)
+        _LogMessage("_SM_StopServicesBatch: stop timed out: " & $aResults[$iTOIdx][0], $LOG_TYPE_SERVICE, $LOG_LEVEL_ERROR)
         DllCall("advapi32.dll", "bool", "CloseServiceHandle", "handle", $aPendingHnd[$iTimeoutIdx])
     Next
 
@@ -362,7 +402,7 @@ Func _SM_GetServiceState($hService)
     Local $iDllErr = @error    ; capture IMMEDIATELY
     Local $iWinErr = _WinAPI_GetLastError()   ; before any other call
     If $iDllErr Or Not $aQuery[0] Then
-        _LogMessage("_SM_GetServiceState: QueryServiceStatus failed (DllErr=" & $iDllErr & ", Win32=" & $iWinErr & ")", "Service", 0)
+        _LogMessage("_SM_GetServiceState: QueryServiceStatus failed (DllErr=" & $iDllErr & ", Win32=" & $iWinErr & ")", $LOG_TYPE_SERVICE, $LOG_LEVEL_ERROR)
         SetError(1)
         Return -1
     EndIf
@@ -488,6 +528,12 @@ Func _SM_BuildResultRow($sName, $iInitState, $iFinalState, $sOutcome, $iWin32Err
     $aRow[2] = $iFinalState
     $aRow[3] = $sOutcome
     $aRow[4] = $iWin32Err
+    ; Column 5: $sNote — human-readable diagnostic note. Non-empty only for outcomes that
+    ; require explanation. Currently populated in two cases (DM-04 §3.6):
+    ;   START_PENDING: "Service in START_PENDING state; stop control not accepted"
+    ;   TIMED_OUT:     "Deadline exceeded (<N>ms)"
+    ; Empty string ("") for all other outcomes. Callers must not treat an empty note as
+    ; an error indicator — check $sOutcome ([i][3]) for outcome classification.
     $aRow[5] = $sNote
     Return $aRow
 EndFunc   ;==>_SM_BuildResultRow

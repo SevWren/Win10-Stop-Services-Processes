@@ -19,3 +19,14 @@ toolchain availability. Produce `docs/BASELINE-INVENTORY.md`.
 - [ ] Record all HotKeySet registrations and note duplicates
 - [ ] Discover AutoIt / Au3Check / compiler availability in environment
 - [ ] Write docs/BASELINE-INVENTORY.md with observed facts only
+
+## Status: CLOSED
+
+All baseline discovery work was completed and recorded.
+
+**What was delivered:**
+- `docs/BASELINE-INVENTORY.md` exists and records the full pre-migration state: all source files, process and service inventories, timing values, output directives, hardcoded machine-specific paths, duplicate `#include` pairs, duplicate `HotKeySet` entries, and the undeclared `$iLastStopProcesses` variable.
+- Toolchain availability (AU3Check, AutoIt3, AutoIt3Wrapper — all Windows-only, unavailable in Linux sandbox) was recorded and cross-referenced to `docs/wiki/blockers.md` (B-001, B-002, B-003).
+
+**Artifacts as evidence:**
+- `/home/vercel-sandbox/repo/docs/BASELINE-INVENTORY.md`

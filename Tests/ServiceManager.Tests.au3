@@ -1,16 +1,80 @@
 #RequireAdmin
 ; =============================================================================
+; #RequireAdmin SCOPE NOTE
+;   This directive is required because _Test_EmptyInput and
+;   _Test_BatchUnknownServices both call _SM_StopServicesBatch, which opens a
+;   live SCM handle via OpenSCManagerW — an operation that requires admin
+;   privileges on Windows. The remaining nine test functions are pure-logic
+;   tests that never open an SCM handle and could run without admin. AutoIt
+;   does not support conditional elevation per-function; a single
+;   #RequireAdmin at the top applies to the entire process. If you need to run
+;   the pure-logic tests without admin, comment out _Test_EmptyInput and
+;   _Test_BatchUnknownServices in the main body and remove #RequireAdmin.
+; =============================================================================
+
+; =============================================================================
 ; ServiceManager.Tests.au3 — Deterministic test harness for ServiceManager.au3
 ; Branch : arch/service-manager-migration
 ; Ticket : T03 — Build ServiceManager.au3 + Deterministic Test Harness
 ; Date   : 2026-11-11
 ;
+; TEST DESIGN PHILOSOPHY
+; ----------------------
+; This harness is organised into two categories of test function:
+;
+;   1. Pure-logic unit tests
+;      These exercise functions that take input values and return output values
+;      with no DllCall, no global state mutation, and no I/O. They are fully
+;      deterministic regardless of the Windows SCM state or the services
+;      installed on the system. Examples:
+;        _SM_ServiceStateToString, _SM_Win32ErrToOutcome, _SM_IsStopEligible,
+;        _SM_StateNeedsPolling, _SM_StateToAlreadyStopped, _SM_BuildResultRow
+;
+;   2. SCM integration tests
+;      These call _SM_StopServicesBatch with real (or deliberately non-existent)
+;      service names. They exercise the actual Phase 1 / Phase 2 algorithm,
+;      including the OpenSCManagerW call. Because live Windows services that
+;      match the production service names (wuauserv, TrustedInstaller, etc.)
+;      are not present in this Linux sandbox environment, the only testable
+;      integration path is the UNAVAILABLE outcome produced when OpenServiceW
+;      returns Win32 error 1060 (ERROR_SERVICE_DOES_NOT_EXIST). This exercises
+;      Phase 1 routing for the non-existent service branch without issuing any
+;      stop controls.
+;
+; STUB PATTERN
+; ------------
+;   There are no stub helper functions in this harness. The module under test
+;   (ServiceManager.au3) exposes its pure-logic helpers as callable Funcs;
+;   tests call them directly. Result arrays for scenario tests are constructed
+;   inline to verify accounting properties independently of live SCM calls.
+;   The term "stub" in older comments referred to _BuildExpectedRow, which has
+;   been removed (dead code — never called).
+;
+; DETERMINISTIC DESIGN CONSTRAINT
+; --------------------------------
+;   REQ-009 prohibits live stop controls in this harness. Per-service result
+;   arrays for timeout, failure, and already-stopped scenarios are constructed
+;   manually to test outcome-accounting properties without touching a live SCM.
+;   The two SCM integration tests (_Test_EmptyInput, _Test_BatchUnknownServices)
+;   do open a live SCM handle but issue no stop controls: the first passes an
+;   empty list; the second uses names that do not exist on any real Windows
+;   install, ensuring Phase 1 routes all services to UNAVAILABLE and returns
+;   without entering Phase 2.
+;
+; CONSOLEWRITE EXCEPTION
+; ----------------------
+;   CODING_STANDARDS.md prohibits direct ConsoleWrite calls outside of
+;   initialization/debug code. This test harness is explicitly exempt: it is a
+;   diagnostic tool with no access to the main-script _LogMessage infrastructure,
+;   and CI-friendly output requires writing directly to stdout. The exception is
+;   limited to test harness files in the Tests/ directory.
+;
 ; PURPOSE
 ;   Verify the pure-logic and result-accounting behaviour of ServiceManager.au3
 ;   without issuing live stop controls to production services.
 ;
-;   All tests run against stub helper functions defined below that simulate SCM
-;   responses. Live SCM calls are NOT made from this harness.
+;   All pure-logic tests are deterministic. SCM integration tests exercise the
+;   UNAVAILABLE code path only (non-existent service names, no stop controls).
 ;
 ; RUNNING
 ;   On Windows with AutoIt installed:
@@ -91,22 +155,12 @@ EndFunc
 ; Unit under test: pure-logic helpers from ServiceManager.au3
 ;
 ; These are tested here by calling the actual functions once ServiceManager.au3
-; is included. The helpers below are STUBS for the DllCall layer so no live
-; SCM traffic is generated.
+; is included. The pure-logic helpers (_SM_ServiceStateToString,
+; _SM_Win32ErrToOutcome, _SM_IsStopEligible, _SM_StateNeedsPolling,
+; _SM_StateToAlreadyStopped, _SM_BuildResultRow) make no DllCall and generate
+; no live SCM traffic. SCM integration tests that call _SM_StopServicesBatch
+; are grouped separately at the bottom of the function list.
 ; ---------------------------------------------------------------------------
-
-; Stub result row builder — mirrors _SM_BuildResultRow in ServiceManager.au3
-; Used in tests to construct expected rows without depending on internal implementation
-Func _BuildExpectedRow($sName, $iInitState, $iFinalState, $sOutcome, $iWin32Err, $sNote = "")
-    Local $aRow[6]
-    $aRow[0] = $sName
-    $aRow[1] = $iInitState
-    $aRow[2] = $iFinalState
-    $aRow[3] = $sOutcome
-    $aRow[4] = $iWin32Err
-    $aRow[5] = $sNote
-    Return $aRow
-EndFunc
 
 ; ---------------------------------------------------------------------------
 ; Tests for _SM_ServiceStateToString (pure mapping function)
@@ -219,32 +273,32 @@ Func _Test_BuildResultRow()
 EndFunc
 
 ; ---------------------------------------------------------------------------
-; Tests for _SM_ResultArray (result 2D array construction)
-; Verifies that _SM_StopServicesBatch returns the correct array dimensions
+; Tests for _SM_StopServicesBatch result column count
+; Verifies the module returns exactly 6 columns per row, not AutoIt array
+; mechanics. Passes two names that do not exist on any real Windows install;
+; _SM_StopServicesBatch opens the SCM and routes both services to UNAVAILABLE
+; (Win32 1060) in Phase 1 without entering Phase 2. The column count of the
+; returned array is a property of the module under test, not of AutoIt.
+;
+; NOTE: This test opens a live SCM handle (requires #RequireAdmin / Windows).
+; The service names are intentionally nonsensical so no stop control is ever
+; issued (REQ-009).
 ; ---------------------------------------------------------------------------
 
 Func _Test_ResultArrayDimensions()
-    ConsoleWrite(@CRLF & "--- Result Array Dimensions ---" & @CRLF)
+    ConsoleWrite(@CRLF & "--- _SM_StopServicesBatch: 6 columns per row ---" & @CRLF)
 
-    ; Build a minimal 3-service result array using the helper
-    Local $aNames[3] = ["svc1", "svc2", "svc3"]
-    Local $aResults[3][6]
+    ; Two names guaranteed not to exist on any Windows system
+    Local $aNames[2] = ["__NonExistent_TestSvc_A__", "__NonExistent_TestSvc_B__"]
+    Local $aResults = _SM_StopServicesBatch($aNames)
 
-    ; Manually populate to simulate what _SM_StopServicesBatch would produce
-    Local $i
-    For $i = 0 To 2
-        $aResults[$i][0] = $aNames[$i]
-        $aResults[$i][1] = 4   ; RUNNING
-        $aResults[$i][2] = 1   ; STOPPED
-        $aResults[$i][3] = $SM_OUTCOME_STOPPED
-        $aResults[$i][4] = 0
-        $aResults[$i][5] = ""
-    Next
-
-    _TestAssert("3-service array: row count = 3",       UBound($aResults, 1) = 3,  "3", String(UBound($aResults, 1)))
-    _TestAssert("3-service array: col count = 6",       UBound($aResults, 2) = 6,  "6", String(UBound($aResults, 2)))
-    _TestAssert("3-service array: row 0 name = svc1",   $aResults[0][0] = "svc1",  "svc1", $aResults[0][0])
-    _TestAssert("3-service array: row 2 outcome",       $aResults[2][3] = $SM_OUTCOME_STOPPED, $SM_OUTCOME_STOPPED, $aResults[2][3])
+    ; The module must return exactly 2 rows (one per input) and exactly 6 columns
+    _TestAssert("batch(2 unknown): row count = 2",    UBound($aResults, 1) = 2, "2", String(UBound($aResults, 1)))
+    _TestAssert("batch(2 unknown): col count = 6",    UBound($aResults, 2) = 6, "6", String(UBound($aResults, 2)))
+    ; Confirm the module correctly sets the service name in column 0
+    _TestAssert("batch(2 unknown): row 0 name preserved", $aResults[0][0] = "__NonExistent_TestSvc_A__", "__NonExistent_TestSvc_A__", $aResults[0][0])
+    ; Confirm outcome is UNAVAILABLE (Win32 1060 path in Phase 1)
+    _TestAssert("batch(2 unknown): row 0 outcome = UNAVAILABLE", $aResults[0][3] = $SM_OUTCOME_UNAVAILABLE, $SM_OUTCOME_UNAVAILABLE, $aResults[0][3])
 EndFunc
 
 ; ---------------------------------------------------------------------------
@@ -287,6 +341,9 @@ EndFunc
 
 ; ---------------------------------------------------------------------------
 ; Tests for state-to-outcome routing (stop-eligibility gate)
+; Focuses on the three routing predicates and their mutual exclusivity.
+; Assertions on _SM_IsStopEligible and _SM_StateNeedsPolling per individual
+; state live in _Test_AllSevenStates to avoid duplication (CR-03 S-06).
 ; ---------------------------------------------------------------------------
 
 Func _Test_StateToOutcomeRouting()
@@ -297,11 +354,8 @@ Func _Test_StateToOutcomeRouting()
     _TestAssert("state RUNNING → not already stopped",               _SM_StateToAlreadyStopped($SM_STATE_RUNNING) = False)
     _TestAssert("state PAUSED  → not already stopped",               _SM_StateToAlreadyStopped($SM_STATE_PAUSED)  = False)
 
-    ; STOP_PENDING at first query → polled (not ALREADY_STOPPED, not ControlService)
-    _TestAssert("state STOP_PENDING → added to pending (needs polling)", _SM_StateNeedsPolling($SM_STATE_STOP_PENDING) = True)
-    _TestAssert("state RUNNING → does NOT need polling before stop",    _SM_StateNeedsPolling($SM_STATE_RUNNING) = False)
-
-    ; Confirm: service already in STOP_PENDING is added to pending list (not to control-to-send list)
+    ; Confirm routing predicates are mutually exclusive for STOP_PENDING:
+    ; eligible=False AND polling=True — these two must never both be True
     _TestAssert("STOP_PENDING: eligible=False, polling=True (mutually exclusive)", _
             (Not _SM_IsStopEligible($SM_STATE_STOP_PENDING)) And _SM_StateNeedsPolling($SM_STATE_STOP_PENDING))
 EndFunc
@@ -378,6 +432,68 @@ Func _Test_UnavailableInBatch()
 EndFunc
 
 ; ---------------------------------------------------------------------------
+; Behavioral integration test: _SM_StopServicesBatch with non-existent services
+;
+; WHY THIS IS THE TESTABLE INTEGRATION PATH IN A LINUX SANDBOX
+; ------------------------------------------------------------
+; The two-phase batch-stop algorithm (Phase 1: issue stop controls; Phase 2:
+; poll against shared deadline) cannot be exercised with real Windows services
+; in this Linux sandbox because:
+;   a) AutoIt runs only on Windows; this harness is marked NOT RUN in the
+;      Linux sandbox (environment gate in the header).
+;   b) Even on Windows, the production service names (wuauserv, TrustedInstaller,
+;      etc.) must NOT be stopped by the test harness (REQ-009 — no live stop
+;      controls).
+;
+; The UNAVAILABLE path (OpenServiceW → Win32 1060 ERROR_SERVICE_DOES_NOT_EXIST)
+; is the only path through Phase 1 that:
+;   - exercises real SCM code (OpenSCManagerW succeeds, OpenServiceW fails)
+;   - issues zero stop controls (the service handle is never obtained)
+;   - produces a deterministic outcome regardless of which Windows system runs it
+;     (a deliberately nonsensical name will never exist)
+;   - reaches the result-accounting branch that records initState=-1,
+;     finalState=-1, outcome=UNAVAILABLE, win32=1060
+;
+; This test validates that the Phase 1 UNAVAILABLE routing in
+; _SM_StopServicesBatch produces the correct per-row result for each input
+; service and that @error=0 (the batch itself did not fail — only individual
+; services were absent).
+;
+; NOTE: Requires #RequireAdmin (opens a live SCM handle on Windows).
+; ---------------------------------------------------------------------------
+
+Func _Test_BatchUnknownServices()
+    ConsoleWrite(@CRLF & "--- _SM_StopServicesBatch: Phase 1 UNAVAILABLE path ---" & @CRLF)
+
+    ; Three names that do not exist on any real Windows install.
+    ; Using names with internal underscores and mixed case to avoid any
+    ; accidental collision with real service names.
+    Local $aNames[3] = ["__TestHarness_NX_Svc1__", "__TestHarness_NX_Svc2__", "__TestHarness_NX_Svc3__"]
+
+    Local $aResults = _SM_StopServicesBatch($aNames)
+
+    ; Batch-level @error must be 0 — SCM opened successfully even though
+    ; the individual services do not exist
+    _TestAssert("unknown services: @error = 0 (SCM open succeeded)",   @error = 0)
+
+    ; Result array must have one row per input service
+    _TestAssert("unknown services: row count = 3",  UBound($aResults, 1) = 3, "3", String(UBound($aResults, 1)))
+
+    ; Each row must have exactly 6 columns
+    _TestAssert("unknown services: col count = 6",  UBound($aResults, 2) = 6, "6", String(UBound($aResults, 2)))
+
+    ; All three services must be routed to UNAVAILABLE (Phase 1: OpenServiceW → 1060)
+    Local $i
+    For $i = 0 To 2
+        _TestAssert("row " & $i & ": outcome = UNAVAILABLE",    $aResults[$i][3] = $SM_OUTCOME_UNAVAILABLE, $SM_OUTCOME_UNAVAILABLE, $aResults[$i][3])
+        _TestAssert("row " & $i & ": win32 = 1060",             $aResults[$i][4] = $SM_ERR_SVC_NOT_EXIST,   "1060",                  String($aResults[$i][4]))
+        _TestAssert("row " & $i & ": initState = -1",           $aResults[$i][1] = -1,                      "-1",                    String($aResults[$i][1]))
+        _TestAssert("row " & $i & ": finalState = -1",          $aResults[$i][2] = -1,                      "-1",                    String($aResults[$i][2]))
+        _TestAssert("row " & $i & ": name preserved in row",    $aResults[$i][0] = $aNames[$i],             $aNames[$i],             $aResults[$i][0])
+    Next
+EndFunc
+
+; ---------------------------------------------------------------------------
 ; Main: run all tests
 ; ---------------------------------------------------------------------------
 
@@ -397,6 +513,7 @@ _Test_StateToOutcomeRouting()
 _Test_AllSevenStates()
 _Test_EmptyInput()
 _Test_UnavailableInBatch()
+_Test_BatchUnknownServices()
 
 _PrintResults()
 

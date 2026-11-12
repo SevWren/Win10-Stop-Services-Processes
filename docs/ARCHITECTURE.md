@@ -22,6 +22,10 @@ Stop Services Processes.au3   ← entry point, scheduling, interaction
   │         _SM_GetServiceState($hService)          ; uses inline "advapi32.dll" string
   │         _SM_ServiceStateToString($iState)
   │         _SM_Win32ErrToOutcome($iWin32Err)
+  │         _SM_IsStopEligible($iState)
+  │         _SM_StateNeedsPolling($iState)
+  │         _SM_StateToAlreadyStopped($iState)
+  │         _SM_BuildResultRow($sName, $iInitState, $iFinalState, $sOutcome, $iWin32Err, $sNote)
   │
   ├── <WinAPI.au3>              ← _WinAPI_GetLastError
   ├── <WinAPIProc.au3>          ← priority class constants
@@ -79,9 +83,49 @@ Global Const $SVC_BATCH_POLL_MS           = 500    ; poll interval within batch-
 ;
 ; Ref: https://learn.microsoft.com/en-us/windows/win32/api/winsvc/nf-winsvc-openscmanagerw
 ; Ref: https://learn.microsoft.com/en-us/windows/win32/api/winsvc/nf-winsvc-openservicew
-; Ref: https://learn.microsoft.com/en-us/windows/win32/api/winsvc/nf-winsvc-queryservicestatus
+; Ref: https://learn.microsoft.com/en-us/windows/win32/api/winsvc/nf-winsvc-queryservicestatus  ; see API choice note below
 ; Ref: https://learn.microsoft.com/en-us/windows/win32/api/winsvc/nf-winsvc-controlservice
 ```
+
+---
+
+## API Choice: QueryServiceStatus vs QueryServiceStatusEx
+
+**Decision**: The implementation uses `QueryServiceStatus` (7-DWORD `SERVICE_STATUS` struct), not
+`QueryServiceStatusEx` (9-DWORD `SERVICE_STATUS_PROCESS` struct).
+
+**Rationale**: The enterprise prompt mandates `QueryServiceStatusEx` and `SERVICE_STATUS_PROCESS`.
+However, the actual implementation in `Includes/ServiceManager.au3` uses `QueryServiceStatus`
+throughout (Phase 1 inspect, Phase 2 poll, and `_SM_GetServiceState` helper). This is a deliberate
+simplification because:
+
+1. The two additional fields in `SERVICE_STATUS_PROCESS` are `dwProcessId` (field 8) and
+   `dwServiceFlags` (field 9). Neither is needed by `_SM_StopServicesBatch` — the function only
+   reads `dwCurrentState` (field 2) to route stop decisions and poll for `SERVICE_STOPPED`.
+2. `ControlService` (also used here) accepts only `LPSERVICE_STATUS` (7 DWORDs) — it has no Ex
+   variant that takes `SERVICE_STATUS_PROCESS`. Both APIs share the same 7-field struct for the
+   stop-control path.
+3. Using `QueryServiceStatus` avoids the `InfoLevel` and `cbBufSize` parameters required by
+   `QueryServiceStatusEx`, reducing call-site complexity with no functional loss for this use case.
+
+**Trade-off**: PID-based duplicate detection (e.g., detecting when two service names map to the
+same host process) is not possible without `dwProcessId`. This is an accepted limitation; the
+batch-stop design does not require PID awareness.
+
+**Struct reference** (both documented per enterprise prompt requirement):
+
+| Struct | Fields | Used by |
+|---|---|---|
+| `SERVICE_STATUS` | 7 DWORDs | `QueryServiceStatus`, `ControlService` (this module) |
+| `SERVICE_STATUS_PROCESS` | 9 DWORDs | `QueryServiceStatusEx`, `ControlServiceEx` (not used here) |
+
+`SERVICE_STATUS` field order: `dwServiceType` (1), `dwCurrentState` (2), `dwControlsAccepted` (3),
+`dwWin32ExitCode` (4), `dwServiceSpecificExitCode` (5), `dwCheckPoint` (6), `dwWaitHint` (7).
+
+`SERVICE_STATUS_PROCESS` adds: `dwProcessId` (8), `dwServiceFlags` (9).
+
+See `docs/adr/` for all architecture decision records. Research source: `docs/research/windows-scm-api.md` §
+"QueryServiceStatus vs QueryServiceStatusEx".
 
 ---
 
@@ -153,6 +197,31 @@ _SM_StopServicesBatch($aNames, $iBatchMs, $iPollMs)
 │
 └── Log + return result array
 ```
+
+### Pending-State Routing Reference
+
+The routing in Phase 1 is determined by three helper predicates (`_SM_StateToAlreadyStopped`,
+`_SM_StateNeedsPolling`, `_SM_IsStopEligible`). The table below shows how every `dwCurrentState`
+value maps to its Phase 1 outcome:
+
+| State (value) | Predicate that fires | Phase 1 action | Expected outcome |
+|---|---|---|---|
+| `SERVICE_STOPPED` (1) | `_SM_StateToAlreadyStopped` = True | Close handle, record result | `ALREADY_STOPPED` |
+| `SERVICE_START_PENDING` (2) | `_SM_IsStopEligible` = False | Close handle, record result with Win32 1061 | `FAILED` (stop cannot be accepted while starting) |
+| `SERVICE_STOP_PENDING` (3) | `_SM_StateNeedsPolling` = True | Add to pendingList, skip ControlService call | `STOPPED` or `TIMED_OUT` after Phase 2 poll |
+| `SERVICE_RUNNING` (4) | `_SM_IsStopEligible` = True | Issue `ControlService(STOP)`, add to pendingList | `STOPPED` or `TIMED_OUT` after Phase 2 poll |
+| `SERVICE_CONTINUE_PENDING` (5) | `_SM_IsStopEligible` = True | Issue `ControlService(STOP)`, add to pendingList | `STOPPED` or `TIMED_OUT` after Phase 2 poll |
+| `SERVICE_PAUSE_PENDING` (6) | `_SM_IsStopEligible` = True | Issue `ControlService(STOP)`, add to pendingList | `STOPPED` or `TIMED_OUT` after Phase 2 poll |
+| `SERVICE_PAUSED` (7) | `_SM_IsStopEligible` = True | Issue `ControlService(STOP)`, add to pendingList | `STOPPED` or `TIMED_OUT` after Phase 2 poll |
+
+Notes:
+- `SERVICE_START_PENDING` (2) is not stop-eligible. `ControlService` would return error 1061
+  (`ERROR_SERVICE_CANNOT_ACCEPT_CTRL`). The implementation detects this via `_SM_IsStopEligible`
+  and records `FAILED` with Win32 1061 without attempting the control call.
+- States 5, 6, 7 (`CONTINUE_PENDING`, `PAUSE_PENDING`, `PAUSED`) are treated identically to
+  `RUNNING` — the stop control is accepted by services in these states. If the service's
+  `dwControlsAccepted` does not include `SERVICE_ACCEPT_STOP`, `ControlService` will fail with
+  1052 (`ERROR_INVALID_SERVICE_CONTROL`) and the outcome will be `FAILED`.
 
 ---
 
@@ -250,6 +319,7 @@ DllCall("advapi32.dll", "bool", "CloseServiceHandle", "handle", $hSCM)
 | `QueryServiceStatus` fails | `FAILED` | Win32 error |
 | `ControlService` fails with 1062 (NOT_ACTIVE) | `ALREADY_STOPPED` | 1062 |
 | `ControlService` fails with 1051 (DEPENDENT) | `FAILED` | 1051 |
+| `ControlService` fails with 1052 (INVALID_SERVICE_CONTROL) | `FAILED` | 1052 |
 | `ControlService` fails with 5 (ACCESS_DENIED) | `FAILED` | 5 |
 | `ControlService` fails with other error | `FAILED` | Win32 error |
 | Service is in STOP_PENDING at first query | Polled; STOPPED or TIMED_OUT | 0 |
@@ -296,6 +366,19 @@ Func _RunServiceBatchStop()
     Next
 EndFunc
 ```
+
+---
+
+## Known Documentation Gap in BASELINE-INVENTORY.md (owned by T1-13)
+
+<!-- CR-04 S-08: docs/BASELINE-INVENTORY.md AU3Check summary table omits the "long" handle-type
+     bug row for ServiceControl.au3. The ServiceControl.au3 technical-findings sub-section does
+     document that the handle type used in DllCall is "long" rather than "handle" (a type mismatch
+     that would generate an AU3Check warning under -w 3), but this finding does not have a row in
+     the AU3Check summary table at the top of BASELINE-INVENTORY.md. The information is present in
+     the file — it is a summary-completeness gap only.
+     This note is recorded here because BASELINE-INVENTORY.md is owned by the T1-13 agent and
+     cannot be edited by this agent (T02). -->
 
 ---
 

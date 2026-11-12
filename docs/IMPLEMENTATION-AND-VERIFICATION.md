@@ -31,7 +31,7 @@ Ticket: T06 — Validate, Compile, Deliver Acceptance Report
 | `.scratch/service-manager-migration/issues/` | Created | 6 ticket markdown files (T01–T06) |
 | `.git/hooks/pre-commit` | Created | AU3Check gate reminder hook |
 | `Enterprise-Grad_Multi-Agent_Engineering_Implementation_Testing_Adversarial_Audit_AutoIt_prompt.md` | Added | Enterprise implementation plan (from project zip) |
-| `.agents/skills/` | Added | Matt Pocock skill set (ask-matt, chief-of-staff, etc.) |
+| `.agents/skills/` | Added | Matt Pocock skill set (ask-matt, chief-of-staff, etc.) — outside the spec's File Map; included because it is required by the agent workflow environment that executed this migration. It has no effect on the AutoIt deliverables and is not part of the migration scope. |
 | `README.md` | Not updated in T04 (no visible behavior change to paths or hotkeys beyond already documented) |
 
 ---
@@ -40,7 +40,7 @@ Ticket: T06 — Validate, Compile, Deliver Acceptance Report
 
 ### Gate 1 — AU3Check Static Analysis
 
-**Status**: NOT RUN — Windows environment required
+**Status**: NOT RUN — Windows environment required (see `docs/wiki/blockers.md` B-001)
 
 **Command** (run on Windows with AutoIt installed):
 ```
@@ -49,26 +49,27 @@ Au3Check.exe -q -d -w 1 -w 2 -w 3 -w 4 "Includes\ServiceManager.au3"
 Au3Check.exe -q -d -w 1 -w 2 -w 3 -w 4 "Tests\ServiceManager.Tests.au3"
 ```
 
-**Static compliance (Linux sandbox)**:
-All three files were written following CLAUDE.md and CODING_STANDARDS.md. The following
-AU3Check issues from the baseline were resolved:
+**Expected exit code**: 0 (no warnings at -w 1 through -w 4)
 
-| Baseline Issue | Resolution |
-|---|---|
-| `$iLastStopProcesses` undeclared (-w 1) | Declared `Global $iLastStopProcesses = 0` |
-| Duplicate `#include <WinAPI.au3>` | Removed duplicate pairs |
-| Duplicate `#include <WinAPIProc.au3>` | Removed duplicate pairs |
-| Duplicate `#include <Array.au3>` | Removed duplicate pairs |
-| Duplicate `HotKeySet("+^9", ...)` | Removed duplicate pairs |
-| Duplicate `HotKeySet("^!+9", ...)` | Removed duplicate pairs |
-| Test file `Global Const` redefinition conflict | Removed duplicate const declarations from test file |
+**Why not run**: `Au3Check.exe` is a Windows-only binary; it is not available in the Linux
+sandbox. This gate must be run by a Windows developer before merging. Results must be
+pasted into this section verbatim (tool output only — no predicted outcomes).
 
-**ServiceManager.au3 specific checks**:
-- `#include-once` present ✓
-- All variables declared with `Local` ✓
-- `"handle"` type strings for all SC_HANDLE parameters ✓
-- `@error` captured immediately after every DllCall ✓
-- `DllStructCreate("dword;dword;dword;dword;dword;dword;dword")` for SERVICE_STATUS ✓
+**Baseline defects addressed in source** (pre-conditions for Gate 1 to pass — verified by
+code inspection during T04/T05, not by tool output):
+
+| Baseline Issue | Change Made | REQ |
+|---|---|---|
+| `$iLastStopProcesses` undeclared (-w 1) | Declared `Global $iLastStopProcesses = 0` | REQ-011 |
+| Duplicate `#include <WinAPI.au3>` | Removed duplicate pairs | REQ-012 |
+| Duplicate `#include <WinAPIProc.au3>` | Removed duplicate pairs | REQ-012 |
+| Duplicate `#include <Array.au3>` | Removed duplicate pairs | REQ-012 |
+| Duplicate `HotKeySet("+^9", ...)` | Removed duplicate pairs | REQ-012 |
+| Duplicate `HotKeySet("^!+9", ...)` | Removed duplicate pairs | REQ-012 |
+| Test file `Global Const` redefinition conflict | Removed duplicate const declarations from test file | T05 STD-001 |
+
+These source changes are necessary pre-conditions but are not a substitute for running
+the tool. Gate 1 status remains NOT RUN until a Windows developer records actual tool output.
 
 ---
 
@@ -150,7 +151,7 @@ All touched paths are now portable. Moving the project directory requires no sou
 
 | REQ | Status | Evidence |
 |---|---|---|
-| REQ-001 | IMPLEMENTED | `_SM_StopServicesBatch` returns [n][6] array; T05 review SPEC-003 |
+| REQ-001 | IMPLEMENTED | `_SM_StopServicesBatch` returns [n][6] array; T05 review SPEC-003; result-row column layout (columns [0]–[5]: service name, initial state, final state, outcome, Win32 error, note) defined in `GLOSSARY.md` §Result Row and `docs/ARCHITECTURE.md` §_SM_StopServicesBatch return contract |
 | REQ-002 | IMPLEMENTED | All 7 states in `_SM_ServiceStateToString`; T05 review SPEC-004 |
 | REQ-003 | IMPLEMENTED | Phase 1/2 two-loop design; T05 review SPEC-005 |
 | REQ-004 | IMPLEMENTED | Minimum access rights; T05 review SPEC-006 |
@@ -159,7 +160,7 @@ All touched paths are now portable. Moving the project directory requires no sou
 | REQ-007 | IMPLEMENTED | "handle" type strings; T05 review SPEC-009 |
 | REQ-008 | IMPLEMENTED | 7-DWORD DllStruct; T05 review SPEC-010 |
 | REQ-009 | IMPLEMENTED | No live SCM calls in tests; T05 review SPEC-001 |
-| REQ-010 | IMPLEMENTED | 9 services in `_RunServiceBatchStop`; T05 review SPEC-01 |
+| REQ-010 | IMPLEMENTED | 9 services in `_RunServiceBatchStop`; T05 review SPEC-011 |
 | REQ-011 | IMPLEMENTED | `Global $iLastStopProcesses = 0`; T05 review STD-05 |
 | REQ-012 | IMPLEMENTED | Duplicate includes/HotKeySets removed; T05 review STD-03/STD-04 |
 | REQ-013 | IMPLEMENTED | `$SVC_POLL_INTERVAL_SEC = 10`; T05 review SPEC-04 |

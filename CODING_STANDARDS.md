@@ -5,15 +5,21 @@
 
 ## Function Naming
 
+> **Authority**: `CLAUDE.md` is the canonical source for naming conventions. This section must remain in sync with the "Coding Conventions → Function Naming" section of `CLAUDE.md`.
+
 - Hotkey-triggered (public): `PascalCase` — `ToggleScript`, `SetProcessPriority`
 - Internal/private: `_UnderscorePascalCase` — `_CloseInstaller`, `_LogMessage`
-- Service-manager module: `_SM_PascalCase` — `_SM_StopServicesBatch`, `_SM_GetServiceState`
+- Service-manager module: `_SM_PascalCase` — `_SM_StopServicesBatch`, `_SM_IsStopEligible`, `_SM_GetServiceState`
+
+> **Note (CR-09)**: `_SM_PascalCase` is a valid third naming tier used by service-manager module helpers. `CLAUDE.md` ("Coding Conventions → Function Naming") is the canonical source for all naming tiers. If this section and `CLAUDE.md` ever conflict, `CLAUDE.md` wins.
 
 ## Logging
 
 All runtime log messages MUST route through `_LogMessage($sMessage, $sType, $iLevel)`.
 Direct `ConsoleWrite` calls outside of initialization/debug code are NOT permitted.
 Log types in use: `"System"`, `"Process"`, `"Service"`, `"ProcessPriority"`, `"PriorityWatchdog"`.
+
+**Exception (CR-03)**: Test harness files (`Tests/*.au3`, `Includes/*.Tests.au3`) may use `ConsoleWrite` directly for test runner output. This is intentional for CI-friendly, human-readable output from the test runner and is not subject to the `_LogMessage` routing requirement.
 
 ## @error Capture
 
@@ -60,6 +66,13 @@ All `.au3` files must satisfy `AU3Check -q -d -w 1 -w 2 -w 3 -w 4`:
 - Declare all variables with `Local` or `Global` before use
 - Use `Dim` only for variables in the global scope outside a function
 - Avoid shadowed variable names between Global and Local scopes
+
+## Test File Conventions
+
+- Test files live under `Tests/` (e.g., `Tests/ServiceControl.Tests.au3`) or use the `*.Tests.au3` naming suffix (e.g., `Includes/ServiceControl.Tests.au3`).
+- The `g_` prefix for global variables in test harnesses is an accepted convention within test files and does not violate the standard variable naming rules applied to production code.
+- Test harness files may use `ConsoleWrite` directly (see Logging → CR-03 exception above).
+- Test files are excluded from the `_SM_PascalCase` removal note; they follow the same two-tier function naming as production code (`PascalCase` / `_UnderscorePascalCase`).
 
 ## Smell Baseline (Fowler, Refactoring ch.3)
 

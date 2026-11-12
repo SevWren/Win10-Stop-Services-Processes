@@ -8,7 +8,7 @@ b44126b0fb4726e0bac84c065ac0851e807e0ffefb769f0181700a638cbe0117  Includes/Servi
 
 ---
 
-## Standards Axis
+## Standards
 
 ### Findings
 
@@ -16,19 +16,19 @@ b44126b0fb4726e0bac84c065ac0851e807e0ffefb769f0181700a638cbe0117  Includes/Servi
 `Local $iPendLen` is declared inside an `If` block (line 217) within the Phase 1 `For` loop, and `Local $iPendLen2` appears at line 263 in the same loop iteration. On each subsequent loop iteration AutoIt re-encounters the `Local` declaration. AU3Check `-w 3` may flag "variable used in a previous declaration" warnings. The suffix `2` on `$iPendLen2` is also a code smell (see STD-005).
 Evidence: lines 217 (`Local $iPendLen = UBound($aPendingIdx)`) and 263 (`Local $iPendLen2 = UBound($aPendingIdx)`) both inside the `For $i` body.
 
-**STD-002** | MINOR | Line ~324 | Mysterious Name: `$jj`
+**STD-002** | MINOR | Line ~324 | Mysterious Name: `$jj` (judgement call)
 The timeout-sweep loop variable is named `$jj` (line 324) while the Phase 2 inner poll loop uses `$j` (line 280). There is no naming convention established for a "second j". A descriptive name (`$iTimeoutIdx` or simply `$i` with an outer scope guard) would remove ambiguity.
 Evidence: `Local $jj` at line 324 vs `Local $j` at line 280.
 
-**STD-003** | INFORMATIONAL | Lines 217, 263 | Duplicated Code: ReDim pattern repeated
+**STD-003** | INFORMATIONAL | Lines 217, 263 | Duplicated Code: ReDim pattern repeated (judgement call)
 The four-line expand-and-assign pattern for `$aPendingIdx` / `$aPendingHnd` appears identically at lines 217–221 (STOP_PENDING branch) and lines 263–267 (ControlService-accepted branch). Extracting to `_SM_AddToPendingList` would eliminate duplication, but as it stands the duplication is limited to two sites and the function is otherwise simple.
 Evidence: Lines 217–221 and 263–267 are structurally identical.
 
-**STD-004** | INFORMATIONAL | Lines 357–370 | Speculative Generality: `_SM_GetServiceState` is never called internally
+**STD-004** | INFORMATIONAL | Lines 357–370 | Speculative Generality: `_SM_GetServiceState` is never called internally (judgement call)
 `_SM_GetServiceState` is defined as an internal helper (documented in the file header) but is not called anywhere within `ServiceManager.au3`. Phase 1 and Phase 2 both call `QueryServiceStatus` directly. The function exists only for the test harness, which is a form of speculative generality in the production module. If the test harness is the only caller, the function could be colocated with the test file, or its "internal" designation should be changed to "test-support export".
 Evidence: No call site for `_SM_GetServiceState` exists within this file.
 
-**STD-005** | INFORMATIONAL | Lines 484–493 | Speculative Generality: `_SM_BuildResultRow` is never called internally
+**STD-005** | INFORMATIONAL | Lines 484–493 | Speculative Generality: `_SM_BuildResultRow` is never called internally (judgement call)
 Similar to STD-004: `_SM_BuildResultRow` is documented as a "convenience helper used internally and by the test harness" but has no internal call sites. All result-row construction is done inline in `_SM_StopServicesBatch`. The function is exposed solely for the test harness.
 Evidence: No call site for `_SM_BuildResultRow` exists within this file.
 
@@ -65,7 +65,7 @@ No checkout root, user-profile, or desktop paths present. All log routing goes t
 
 ---
 
-## Spec Axis
+## Spec
 
 ### Findings
 
@@ -186,3 +186,7 @@ The function is an internal helper not called from the main script, so there is 
 - **STD-002 (MINOR)**: Rename `$jj` to a descriptive loop variable name.
 - **STD-003/STD-004/STD-005 (INFORMATIONAL)**: The duplicated ReDim pattern and the two never-internally-called helpers are acceptable pending the test harness implementation; re-evaluate at T03 completion.
 - **SPEC-002 (INFORMATIONAL)**: Update the header comment of `_SM_Win32ErrToOutcome` to clarify that the 1060 branch is a defensive catch that is not expected from ControlService.
+
+---
+
+**Summary:** 5 Standards findings (1 hard, 4 judgement call), 2 Spec findings; worst Standards issue: MINOR — `Local` redeclaration inside loop branches (STD-001) may surface AU3Check `-w 3` warnings; worst Spec issue: MAJOR — `_SM_GetServiceState` signature (`$hService` only) diverges from `ARCHITECTURE.md` contract (`$hAdvapi32, $hService`) (SPEC-001).

@@ -1,3 +1,4 @@
+#include-once
 Global $STANDARD_RIGHTS_REQUIRED2 = 0x000F0000
 
 ; Service Control Manager access types

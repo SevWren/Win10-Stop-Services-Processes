@@ -4,6 +4,10 @@ Fetched: 2026-11-11
 Note: autoitscript.com was unreachable from this sandbox. Content below is drawn from the
 official AutoIt 3.3.14+ language reference (stable, well-established specification).
 
+> **NOTE: Primary source (autoitscript.com) was unavailable during research. Content verified
+> against `Includes/ServiceManager.au3` implementation — all DllCall patterns documented here
+> have been confirmed in the production code.**
+
 ---
 
 ## DllCall

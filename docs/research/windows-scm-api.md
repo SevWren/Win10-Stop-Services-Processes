@@ -99,6 +99,68 @@ SC_HANDLE OpenServiceW(
 
 ---
 
+## QueryServiceStatusEx
+
+**DLL**: `advapi32.dll`
+**Header**: `winsvc.h`
+
+### Signature
+
+```cpp
+BOOL QueryServiceStatusEx(
+  [in]            SC_HANDLE  hService,         // Service handle
+  [in]            SC_STATUS_TYPE InfoLevel,    // Must be SC_STATUS_PROCESS_INFO (0)
+  [out, optional] LPBYTE     lpBuffer,         // Pointer to buffer receiving SERVICE_STATUS_PROCESS
+  [in]            DWORD      cbBufSize,        // Size of lpBuffer in bytes
+  [out]           LPDWORD    pcbBytesNeeded    // Receives required size if buffer too small
+);
+```
+
+### Parameters
+
+| Parameter | Type | Notes |
+|-----------|------|-------|
+| `hService` | `SC_HANDLE` | From `OpenService`. Must have `SERVICE_QUERY_STATUS` access right. |
+| `InfoLevel` | `SC_STATUS_TYPE` | Must be `SC_STATUS_PROCESS_INFO` (value 0). The only defined info level. |
+| `lpBuffer` | `LPBYTE` | Out-pointer to a buffer large enough to hold `SERVICE_STATUS_PROCESS` (9 DWORDs = 36 bytes). |
+| `cbBufSize` | `DWORD` | Size of `lpBuffer` in bytes. Pass `sizeof(SERVICE_STATUS_PROCESS)` = 36. |
+| `pcbBytesNeeded` | `LPDWORD` | Receives the required buffer size if `cbBufSize` is too small. Always provide a valid pointer. |
+
+### InfoLevel Constant
+
+| Constant | Value | Meaning |
+|----------|-------|---------|
+| `SC_STATUS_PROCESS_INFO` | 0 | Returns `SERVICE_STATUS_PROCESS` (9 DWORDs). The only valid value. |
+
+### Return Value
+
+- **Success**: nonzero (TRUE). `lpBuffer` holds a filled `SERVICE_STATUS_PROCESS`.
+- **Failure**: zero (FALSE). Call `GetLastError()` for details.
+
+### Error Codes on Failure
+
+| Code | Name | Description |
+|------|------|-------------|
+| 5 | `ERROR_ACCESS_DENIED` | Handle does not have `SERVICE_QUERY_STATUS` access right. |
+| 6 | `ERROR_INVALID_HANDLE` | The handle is invalid. |
+| 87 | `ERROR_INVALID_PARAMETER` | `InfoLevel` is not `SC_STATUS_PROCESS_INFO`, or `pcbBytesNeeded` is NULL. |
+| 122 | `ERROR_INSUFFICIENT_BUFFER` | `cbBufSize` is smaller than required; `pcbBytesNeeded` holds the needed size. |
+
+### QueryServiceStatus vs QueryServiceStatusEx — When to Use Which
+
+| Criterion | `QueryServiceStatus` | `QueryServiceStatusEx` |
+|-----------|---------------------|----------------------|
+| Struct filled | `SERVICE_STATUS` (7 DWORDs) | `SERVICE_STATUS_PROCESS` (9 DWORDs) |
+| Returns PID | No | Yes (`dwProcessId`) |
+| Returns service flags | No | Yes (`dwServiceFlags`) |
+| Required buffer | 28 bytes | 36 bytes |
+| DllCall complexity | Simpler — no InfoLevel or size params | Requires `InfoLevel`, `cbBufSize`, `pcbBytesNeeded` params |
+| Available since | Windows NT 3.5 | Windows 2000 |
+
+**Trade-off**: Use `QueryServiceStatusEx` when you need the hosting process ID (e.g., to kill a service's process directly, or to identify whether a service shares a host process with others). Use `QueryServiceStatus` when you only need the service state integer — it is simpler to call and the DllCall pattern is shorter. The implementation in `Includes/ServiceManager.au3` uses `QueryServiceStatus` because it requires only `dwCurrentState` (field 2) and does not need the PID; this is a deliberate documented choice, not an oversight. The spec named `QueryServiceStatusEx` as a research target because the original design anticipated needing the PID, but the final implementation confirmed it is not required for the batch-stop operation.
+
+---
+
 ## QueryServiceStatus
 
 **DLL**: `advapi32.dll`
@@ -416,3 +478,47 @@ Administrators are granted `SERVICE_ALL_ACCESS` by default.
 | `ControlServiceEx` | `SERVICE_STATUS_PROCESS` | 9 | Yes |
 
 Both `QueryServiceStatus` and `ControlService` use the 7-field `SERVICE_STATUS` struct.
+
+---
+
+## Service Inventory Reconciliation
+
+**Spec requirement**: Reconcile service inventory against baseline (FDResPub, fdPHost, TrustedInstaller, wuauserv, UsoSvc, DoSvc, WaaSMedicSvc, SSDPSRV, sppsvc).
+
+### Baseline vs Enterprise-Prompt Inventory
+
+The cloned repo baseline (`_stopservicescustom()` in `Stop Services Processes.au3` before migration) contained **6 services**:
+
+```
+TrustedInstaller, wuauserv, UsoSvc, DoSvc, WaaSMedicSvc, sppsvc
+```
+
+The enterprise prompt specified **9 services**. Three services were absent from the baseline and have been added:
+
+| Service | In baseline | In enterprise prompt | Delta |
+|---------|------------|---------------------|-------|
+| `TrustedInstaller` | Yes | Yes | — |
+| `wuauserv` | Yes | Yes | — |
+| `UsoSvc` | Yes | Yes | — |
+| `DoSvc` | Yes | Yes | — |
+| `WaaSMedicSvc` | Yes | Yes | — |
+| `sppsvc` | Yes | Yes | — |
+| `FDResPub` | No | Yes | Added |
+| `fdPHost` | No | Yes | Added |
+| `SSDPSRV` | No | Yes | Added |
+
+The current implementation in `_RunServiceBatchStop()` uses all 9 services per the enterprise prompt. This delta is recorded in `docs/BASELINE-INVENTORY.md`.
+
+### Per-Service Reference
+
+| Service Name | Display Name | Typical State | Special Considerations |
+|-------------|--------------|---------------|----------------------|
+| `FDResPub` | Function Discovery Resource Publication | Running or Stopped (variable) | Publishes the computer and its resources to the network; often running on domain-joined machines. No special stop constraints. |
+| `fdPHost` | Function Discovery Provider Host | Running or Stopped (variable) | Hosts Function Discovery providers; `FDResPub` depends on it. Stop `FDResPub` first if stopping both, though the batch approach handles dependency failures via `ERROR_DEPENDENT_SERVICES_RUNNING`. |
+| `TrustedInstaller` | Windows Modules Installer | Stopped (triggered on demand) | Installs, modifies, and removes Windows updates and optional components. Also appears as the process `TrustedInstaller.exe` in the process inventory. Stopping the service does not kill the process if it has already detached; the process kill and service stop are handled independently. |
+| `wuauserv` | Windows Update | Running or Stop-Pending | Core Windows Update service. Frequently in START_PENDING or RUNNING when updates are active. May restart quickly via task scheduler; repeated stops are expected. |
+| `UsoSvc` | Update Orchestrator Service | Running or Stopped | Orchestrates the sequence of Windows Update download and install operations. Depends on `wuauserv`. |
+| `DoSvc` | Delivery Optimization | Running or Stopped | Handles peer-to-peer and CDN delivery of Windows Update content. Can be in START_PENDING during active downloads. |
+| `WaaSMedicSvc` | Windows Update Medic Service | Running | Protected by a service protection mechanism on Windows 10 1803+; `ControlService` with `SERVICE_CONTROL_STOP` may return `ERROR_ACCESS_DENIED` (5) or `ERROR_SERVICE_CANNOT_ACCEPT_CTRL` (1061). Expect FAILED outcome on modern builds. |
+| `SSDPSRV` | SSDP Discovery | Running or Stopped | Discovers networked devices and services using SSDP. `fdPHost` and `FDResPub` may depend on it. No elevated stop constraints. |
+| `sppsvc` | Software Protection | Running or Stopped | Manages software licensing; may resist stop with `ERROR_ACCESS_DENIED` on some configurations. The old implementation had a `ProcessClose("sppsvc.exe")` fallback; the new batch path does not — if the service stop fails, outcome is FAILED and no process kill is attempted. |

@@ -8,7 +8,7 @@ d2722fe34fe2c697d8179e803f753be732fca4ff6e6f925ad44724350465dab9  Stop Services 
 
 ---
 
-## Standards Axis
+## Standards
 
 ### Findings
 
@@ -44,7 +44,7 @@ Baseline had 2 duplicate `HotKeySet` entries (`"+^9"` and `"^!+9"`). Current fil
 Line 65: `Global $iLastStopProcesses = 0` is present, uncommented, and in the globals section.
 Baseline had it commented out (`; Global $iLastStopProcesses`). REQ-011 addressed.
 
-**STD-06 — PASS — Logging via _LogMessage**
+**STD-06 — MINOR — Logging via _LogMessage**
 All runtime log messages route through `_LogMessage`. `ConsoleWrite` appears only in:
 - Initialization/log-setup code (lines 82–105): acceptable per CODING_STANDARDS.md ("only in
   init code is acceptable").
@@ -91,12 +91,7 @@ Line 74: `Global Const $PROCESS_IDLE = 0` — declared correctly.
 `_TrayNotify` (line 570) calls `ToolTip(...)`, not `TrayTip(...)`. All watchdog notifications
 route through `_TrayNotify`. No bare `TrayTip` calls found.
 
-**STD-13 — MINOR — _miscpopups Uses ConsoleWrite Instead of _LogMessage**
-(See STD-06 above.) Lines 588 and 592 use `ConsoleWrite` for notification that popup windows
-were closed. These should use `_LogMessage(..., "System", 1)` or similar per standards.
-Severity: MINOR
-
-**STD-14 — INFORMATIONAL — CheckElapsedTime Missing Underscore Prefix**
+**STD-13 — INFORMATIONAL — CheckElapsedTime Missing Underscore Prefix (judgement call)**
 `CheckElapsedTime` at line 255 is a private helper but does not follow `_UnderscorePascalCase`.
 This was present in the baseline and is not a regression, but it is a mild naming inconsistency.
 Severity: INFORMATIONAL
@@ -104,14 +99,14 @@ Severity: INFORMATIONAL
 ### Summary
 
 Standards axis: 12 of 12 required checks pass. Two additional findings:
-- 1 MINOR: `_miscpopups` uses bare `ConsoleWrite` (STD-06/STD-13)
-- 1 INFORMATIONAL: `CheckElapsedTime` missing `_` prefix (STD-14)
+- 1 MINOR: `_miscpopups` uses bare `ConsoleWrite` (STD-06)
+- 1 INFORMATIONAL: `CheckElapsedTime` missing `_` prefix (STD-13, judgement call)
 
 No BLOCKERs or CRITICALs on the Standards axis.
 
 ---
 
-## Spec Axis
+## Spec
 
 ### Findings
 
@@ -201,6 +196,13 @@ this review (which covers the main script only), but should be confirmed in the 
 review pass.
 Severity: INFORMATIONAL
 
+**SPEC-15 — PASS — Superseded function `_stopservicescustom` confirmed removed**
+MR-SPEC-003 noted that the review had not verified whether the old `_stopservicescustom` function
+(which called `ServiceControl.au3` directly) was removed from the file. Inspection of
+`Stop Services Processes.au3` confirms: no definition or call site for `_stopservicescustom`
+exists anywhere in the current file. The monitoring loop (line 133) calls `_RunServiceBatchStop()`
+exclusively. The superseded function has been fully removed with no residual dead code.
+
 **SPEC-14 — INFORMATIONAL — CLAUDE.md _TrayNotify Auto-Clear Discrepancy**
 CLAUDE.md (line 151) states `_TrayNotify` auto-clears "after 3 seconds via
 `AdlibRegister("_ClearTrayNotify", 3000)`". The actual implementation at line 572 uses
@@ -210,9 +212,10 @@ Severity: INFORMATIONAL
 
 ### Summary
 
-Spec axis: 12 of 12 required checks pass. Zero BLOCKERs, CRITICALs, or MAJORs on the Spec axis.
-Two INFORMATIONAL findings: $SM_OUTCOME_* constant values to be verified in ServiceManager review;
-_TrayNotify clear delay documented as 3s but implemented as 2s.
+Spec axis: 13 of 13 required checks pass. Zero BLOCKERs, CRITICALs, or MAJORs on the Spec axis.
+Two INFORMATIONAL findings: $SM_OUTCOME_* constant values to be verified in ServiceManager review
+(SPEC-13); _TrayNotify clear delay documented as 3s but implemented as 2s (SPEC-14).
+SPEC-15 (new): Superseded `_stopservicescustom` function confirmed absent from the file.
 
 ---
 
@@ -227,7 +230,7 @@ correctly. All hotkeys, the priority watchdog, log rotation, and _miscpopups are
 
 Conditions to resolve before final APPROVED status:
 
-1. (MINOR — STD-06/STD-13) Replace the two bare `ConsoleWrite` calls in `_miscpopups` (lines
+1. (MINOR — STD-06) Replace the two bare `ConsoleWrite` calls in `_miscpopups` (lines
    588 and 592) with `_LogMessage` calls. This is a standards violation, not a spec defect,
    but it should be corrected to maintain logging hygiene.
 
@@ -237,3 +240,7 @@ Conditions to resolve before final APPROVED status:
 
 3. (INFORMATIONAL — SPEC-14) Correct CLAUDE.md to reflect the actual 2000 ms auto-clear delay
    (or change the implementation to 3000 ms if 3s was intentional).
+
+---
+
+**Summary:** 2 Standards findings (1 hard, 1 judgement call), 2 Spec findings; worst Standards issue: MINOR — bare `ConsoleWrite` calls in `_miscpopups` violate the no-direct-ConsoleWrite-outside-init standard (STD-06); worst Spec issue: none above INFORMATIONAL — superseded `_stopservicescustom` confirmed removed (SPEC-15 PASS); two open INFORMATIONALs are `$SM_OUTCOME_*` constant cross-verification (SPEC-13) and CLAUDE.md auto-clear delay mismatch (SPEC-14).

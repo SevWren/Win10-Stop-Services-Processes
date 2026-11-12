@@ -30,7 +30,7 @@ Opt("WinTitleMatchMode", 2)
 #EndRegion ;Includes/Options/Permissions
 
 #Region ;hotkeys
-HotKeySet("{ScrollLock}{PAUSE}", "_exit")
+HotKeySet("{ScrollLock}{PAUSE}", "_Exit")
 HotKeySet("+{F1}", "ToggleScript")       ; Shift+F1 — toggle monitoring loop on/off
 HotKeySet("+^9", "SetProcessPriority")   ; Ctrl+Shift+9 — set priority for all instances of a named process
 HotKeySet("^!+9", "LockProcessPriority") ; Ctrl+Alt+Shift+9 — lock a specific PID's priority and auto-restore on drift
@@ -47,8 +47,42 @@ Global Const $SVC_BATCH_TIMEOUT_MS     = 20000   ; shared deadline for one batch
 Global Const $SVC_BATCH_POLL_MS        = 500     ; poll sleep within batch-stop wait loop (ms)
 #EndRegion
 
+#Region ;Configuration — Log constants
+; $LOG_LEVEL_ERROR, $LOG_LEVEL_INFO, $LOG_LEVEL_VERBOSE and $LOG_TYPE_SYSTEM,
+; $LOG_TYPE_SERVICE are defined in Includes\ServiceManager.au3 (authoritative).
+; Duplicate definitions removed to fix AU3Check duplicate-declaration errors.
+
+; Log Type constants unique to this script — passed as $sType to _LogMessage.
+; Ref: docs/domain-modeling/proposals/DM-07-logging-audit.md §4.2
+Global Const $LOG_TYPE_PROCESS          = "Process"          ; process kill actions
+Global Const $LOG_TYPE_PROCESS_PRIORITY = "ProcessPriority"  ; one-shot priority set actions
+Global Const $LOG_TYPE_PRIORITY_WATCHDOG = "PriorityWatchdog" ; watchdog lifecycle and drift events
+#EndRegion
+
+#Region ;Configuration — AutoIt process priority constants
+; Named constants for the integer argument to ProcessSetPriority (0–5).
+; These are AutoIt-layer constants — entirely different from Windows API PRIORITY_CLASS hex values.
+; Conversion between the two schemes: _WinAPIPriorityClassToAutoItConst().
+; Ref: docs/domain-modeling/proposals/DM-02-process-management.md §1.3
+Global Const $AUTOIT_PRIORITY_IDLE         = 0
+Global Const $AUTOIT_PRIORITY_BELOW_NORMAL = 1
+Global Const $AUTOIT_PRIORITY_NORMAL       = 2
+Global Const $AUTOIT_PRIORITY_ABOVE_NORMAL = 3
+Global Const $AUTOIT_PRIORITY_HIGH         = 4
+Global Const $AUTOIT_PRIORITY_REALTIME     = 5
+#EndRegion
+
+#Region ;Configuration — Target lists
+; Service Target List: Windows service names stopped every $SVC_POLL_INTERVAL_SEC seconds.
+; Edit here to add/remove service targets — do not modify _RunServiceBatchStop body.
+; Ref: docs/domain-modeling/proposals/DM-06-configuration-lists.md §3
+Global $aSvcTargetNames[9] = [ _
+    "FDResPub", "fdPHost", "TrustedInstaller", "wuauserv", _
+    "UsoSvc", "DoSvc", "WaaSMedicSvc", "SSDPSRV", "sppsvc"]
+#EndRegion
+
 #Region ;Variables/Logging
-Global $sStringInstaller   = "In the _CloserInstaller function and just terminated"
+Global $sStringInstaller   = "In the _KillProcessList function and just terminated"
 Global $taskcloseran       = 0
 
 ; Process inventory — processes closed every $PROC_POLL_INTERVAL_SEC seconds.
@@ -68,7 +102,7 @@ Global $iconfile = @ScriptDir & "\ff7.ico"
 
 Global $iLogMaxAgeDays = 7
 Global $sLogFile       = @HomeDrive & "\login\closure_log.txt"
-Global $iLogLevel      = 2      ; 0=Error, 1=Info, 2=Verbose
+Global $iLogLevel      = $LOG_LEVEL_VERBOSE   ; ceiling: messages above this level are dropped
 Global $bLogToConsole  = True   ; mirrors output to SciTE console
 
 Global Const $PROCESS_IDLE = 0  ; not defined in this AutoIt version's AutoItConstants.au3
@@ -91,7 +125,7 @@ If Not FileExists($sLogFile) Then
     Else
         ConsoleWrite("DEBUG: Directory exists or was created. Writing initial log entry directly." & @CRLF)
         Dim $sDateTime = _NowTime(12) & " " & @MDAY & "/" & @MON & "/" & @YEAR
-        Dim $sLogEntry = $sDateTime & " [System] Log file initialized"
+        Dim $sLogEntry = $sDateTime & " [" & $LOG_TYPE_SYSTEM & "] Log file initialized"
         FileWrite($sLogFile, $sLogEntry & @CRLF)
         If @error Then
             ConsoleWrite("FATAL ERROR: Could not write initial entry to log file: " & $sLogFile & " (Error: " & @error & "). Check permissions or antivirus." & @CRLF)
@@ -115,26 +149,26 @@ WEnd
 ; ---------------------------------------------------------------------------
 Func ToggleScript()
     If $bScriptRunning Then
-        _LogMessage("F1 pressed - Pausing script", "System", 1)
+        _LogMessage("F1 pressed - Pausing script", $LOG_TYPE_SYSTEM, $LOG_LEVEL_INFO)
         MsgBox($MB_SYSTEMMODAL, "AutoIT Script", "Script paused!", 1)
         $bScriptRunning = False
     Else
-        _LogMessage("F1 pressed - Starting script", "System", 1)
+        _LogMessage("F1 pressed - Starting script", $LOG_TYPE_SYSTEM, $LOG_LEVEL_INFO)
         MsgBox($MB_SYSTEMMODAL, "AutoIT Script", "Script started!", 1)
         $bScriptRunning = True
     EndIf
 
     While $bScriptRunning   ; active monitoring loop — exits when Shift+F1 sets $bScriptRunning = False
-        If CheckElapsedTime($iLastStopProcesses, $PROC_POLL_INTERVAL_SEC) Then
-            _CloseInstaller()
+        If _CheckElapsedTime($iLastStopProcesses, $PROC_POLL_INTERVAL_SEC) Then
+            _KillProcessList()
             $iLastStopProcesses = TimerInit()
         EndIf
-        If CheckElapsedTime($iLastStopServices, $SVC_POLL_INTERVAL_SEC) Then
+        If _CheckElapsedTime($iLastStopServices, $SVC_POLL_INTERVAL_SEC) Then
             _RunServiceBatchStop()
             $iLastStopServices = TimerInit()
         EndIf
         Sleep($MAIN_LOOP_SLEEP_MS)
-        _miscpopups()
+        _MiscPopups()
     WEnd
 EndFunc   ;==>ToggleScript
 
@@ -160,10 +194,12 @@ Func _CheckAndRotateLogFile($sPath, $iDaysMax)
 EndFunc   ;==>_CheckAndRotateLogFile
 
 ; ---------------------------------------------------------------------------
-; Func _CloseInstaller
+; Func _KillProcessList
+; Force-kills processes via ProcessClose (TerminateProcess) — no graceful path.
 ; Terminates every process named in $sProcesses[]. Called every $PROC_POLL_INTERVAL_SEC.
+; Ref: docs/domain-modeling/proposals/DM-03-stop-terminate-semantics.md §2.2
 ; ---------------------------------------------------------------------------
-Func _CloseInstaller()
+Func _KillProcessList()
     Local $iSuccess = 0, $iFailure = 0, $bActionTaken = False
 
     For $i = 0 To UBound($sProcesses) - 1
@@ -172,36 +208,31 @@ Func _CloseInstaller()
             Local $iResult = ProcessClose($sProcesses[$i])
             If $iResult = 1 Then
                 $iSuccess += 1
-                _LogMessage("Successfully closed process: " & $sProcesses[$i], "Process", 1)
+                _LogMessage("Successfully killed process: " & $sProcesses[$i], $LOG_TYPE_PROCESS, $LOG_LEVEL_INFO)
             Else
                 $iFailure += 1
-                _LogMessage("Failed to close process: " & $sProcesses[$i] & " (Error: " & @error & ")", "Process", 0)
+                _LogMessage("Failed to kill process: " & $sProcesses[$i] & " (Error: " & @error & ")", $LOG_TYPE_PROCESS, $LOG_LEVEL_ERROR)
             EndIf
         EndIf
     Next
 
     If $bActionTaken Then
-        _LogMessage("Process closure summary - Success: " & $iSuccess & ", Failed: " & $iFailure, "Process", 1)
+        _LogMessage("Process kill summary - Success: " & $iSuccess & ", Failed: " & $iFailure, $LOG_TYPE_PROCESS, $LOG_LEVEL_INFO)
     EndIf
-EndFunc   ;==>_CloseInstaller
+EndFunc   ;==>_KillProcessList
 
 ; ---------------------------------------------------------------------------
 ; Func _RunServiceBatchStop
 ; Wrapper that calls _SM_StopServicesBatch() and routes each result row to
 ; _LogMessage. Called every $SVC_POLL_INTERVAL_SEC.
 ;
-; Service inventory per enterprise prompt (9 services):
-;   FDResPub, fdPHost, TrustedInstaller, wuauserv, UsoSvc, DoSvc,
-;   WaaSMedicSvc, SSDPSRV, sppsvc
+; Service Target List (9 services) is declared in the Configuration region above:
+;   $aSvcTargetNames — edit there to add/remove targets.
 ; ---------------------------------------------------------------------------
 Func _RunServiceBatchStop()
-    Local $aNames[9] = [ _
-        "FDResPub", "fdPHost", "TrustedInstaller", "wuauserv", _
-        "UsoSvc", "DoSvc", "WaaSMedicSvc", "SSDPSRV", "sppsvc"]
-
-    Local $aResults = _SM_StopServicesBatch($aNames, $SVC_BATCH_TIMEOUT_MS, $SVC_BATCH_POLL_MS)
+    Local $aResults = _SM_StopServicesBatch($aSvcTargetNames, $SVC_BATCH_TIMEOUT_MS, $SVC_BATCH_POLL_MS)
     If @error Then
-        _LogMessage("Service batch stop: could not open SCM — batch skipped", "Service", 0)
+        _LogMessage("Service batch stop: could not open SCM — batch skipped", $LOG_TYPE_SERVICE, $LOG_LEVEL_ERROR)
         Return
     EndIf
 
@@ -211,17 +242,17 @@ Func _RunServiceBatchStop()
         Local $iWin32   = $aResults[$i][4]
         Select
             Case $sOutcome = $SM_OUTCOME_STOPPED
-                _LogMessage("Service stopped: " & $sSvcName, "Service", 1)
+                _LogMessage("Service stopped: " & $sSvcName, $LOG_TYPE_SERVICE, $LOG_LEVEL_INFO)
             Case $sOutcome = $SM_OUTCOME_ALREADY
-                _LogMessage("Service already stopped: " & $sSvcName, "Service", 2)
+                _LogMessage("Service already stopped: " & $sSvcName, $LOG_TYPE_SERVICE, $LOG_LEVEL_VERBOSE)
             Case $sOutcome = $SM_OUTCOME_TIMEDOUT
-                _LogMessage("Service stop timed out: " & $sSvcName, "Service", 0)
+                _LogMessage("Service stop timed out: " & $sSvcName, $LOG_TYPE_SERVICE, $LOG_LEVEL_ERROR)
             Case $sOutcome = $SM_OUTCOME_UNAVAILABLE
-                _LogMessage("Service not found: " & $sSvcName, "Service", 2)
+                _LogMessage("Service not found: " & $sSvcName, $LOG_TYPE_SERVICE, $LOG_LEVEL_VERBOSE)
             Case $sOutcome = $SM_OUTCOME_FAILED
-                _LogMessage("Service stop failed: " & $sSvcName & " (Win32: " & $iWin32 & ")", "Service", 0)
+                _LogMessage("Service stop failed: " & $sSvcName & " (Win32: " & $iWin32 & ")", $LOG_TYPE_SERVICE, $LOG_LEVEL_ERROR)
             Case Else
-                _LogMessage("Service outcome unknown: " & $sSvcName & " (" & $sOutcome & ")", "Service", 0)
+                _LogMessage("Service outcome unknown: " & $sSvcName & " (" & $sOutcome & ")", $LOG_TYPE_SERVICE, $LOG_LEVEL_ERROR)
         EndSelect
     Next
 EndFunc   ;==>_RunServiceBatchStop
@@ -249,12 +280,12 @@ Func _LogMessage($sMessage, $sType, $iLevel)
 EndFunc   ;==>_LogMessage
 
 ; ---------------------------------------------------------------------------
-; Func CheckElapsedTime
+; Func _CheckElapsedTime
 ; Returns True if at least $iInterval seconds have elapsed since $iStartTime.
 ; ---------------------------------------------------------------------------
-Func CheckElapsedTime($iStartTime, $iInterval)
+Func _CheckElapsedTime($iStartTime, $iInterval)
     Return TimerDiff($iStartTime) >= ($iInterval * 1000)
-EndFunc   ;==>CheckElapsedTime
+EndFunc   ;==>_CheckElapsedTime
 
 ; ---------------------------------------------------------------------------
 ; Func SetProcessPriority
@@ -263,38 +294,38 @@ EndFunc   ;==>CheckElapsedTime
 Func SetProcessPriority()
     Local $sProcessName = InputBox("Process Priority", "Enter process name:")
     If @error Then
-        _LogMessage("Process priority setting cancelled by user (Process Name Input)", "ProcessPriority", 1)
+        _LogMessage("Process priority setting cancelled by user (Process Name Input)", $LOG_TYPE_PROCESS_PRIORITY, $LOG_LEVEL_INFO)
         Return
     EndIf
     If $sProcessName = "" Then
-        _LogMessage("Process priority setting cancelled: Process name cannot be empty.", "ProcessPriority", 1)
+        _LogMessage("Process priority setting cancelled: Process name cannot be empty.", $LOG_TYPE_PROCESS_PRIORITY, $LOG_LEVEL_INFO)
         MsgBox($MB_SYSTEMMODAL, "Process Priority", "Process name cannot be empty.", 1)
         Return
     EndIf
 
     Local $sPriorityLevel = InputBox("Process Priority", "Select priority level:" & @CRLF & "1 - Below Normal" & @CRLF & "2 - Normal" & @CRLF & "3 - Above Normal")
     If @error Then
-        _LogMessage("Process priority setting cancelled by user (Priority Level Input)", "ProcessPriority", 1)
+        _LogMessage("Process priority setting cancelled by user (Priority Level Input)", $LOG_TYPE_PROCESS_PRIORITY, $LOG_LEVEL_INFO)
         Return
     EndIf
 
     Local $iPriorityConst
     Switch $sPriorityLevel
         Case "1"
-            $iPriorityConst = $PROCESS_BELOWNORMAL
+            $iPriorityConst = $AUTOIT_PRIORITY_BELOW_NORMAL
         Case "2"
-            $iPriorityConst = $PROCESS_NORMAL
+            $iPriorityConst = $AUTOIT_PRIORITY_NORMAL
         Case "3"
-            $iPriorityConst = $PROCESS_ABOVENORMAL
+            $iPriorityConst = $AUTOIT_PRIORITY_ABOVE_NORMAL
         Case Else
-            _LogMessage("Invalid priority level entered: " & $sPriorityLevel, "ProcessPriority", 0)
+            _LogMessage("Invalid priority level entered: " & $sPriorityLevel, $LOG_TYPE_PROCESS_PRIORITY, $LOG_LEVEL_ERROR)
             MsgBox($MB_SYSTEMMODAL, "Process Priority", "Invalid priority level. Please enter 1, 2, or 3.", 1)
             Return
     EndSwitch
 
     Local $aProcessList = ProcessList($sProcessName)
     If @error Or $aProcessList[0][0] = 0 Then
-        _LogMessage("No processes found with the name '" & $sProcessName & "'.", "ProcessPriority", 1)
+        _LogMessage("No processes found with the name '" & $sProcessName & "'.", $LOG_TYPE_PROCESS_PRIORITY, $LOG_LEVEL_INFO)
         MsgBox($MB_SYSTEMMODAL, "Process Priority", "No processes found with the name '" & $sProcessName & "'.", 1)
         Return
     EndIf
@@ -303,11 +334,11 @@ Func SetProcessPriority()
     Local $iFailureCount = 0
     Local $sPriorityName
     Switch $iPriorityConst
-        Case $PROCESS_BELOWNORMAL
+        Case $AUTOIT_PRIORITY_BELOW_NORMAL
             $sPriorityName = "Below Normal"
-        Case $PROCESS_NORMAL
+        Case $AUTOIT_PRIORITY_NORMAL
             $sPriorityName = "Normal"
-        Case $PROCESS_ABOVENORMAL
+        Case $AUTOIT_PRIORITY_ABOVE_NORMAL
             $sPriorityName = "Above Normal"
     EndSwitch
 
@@ -317,15 +348,15 @@ Func SetProcessPriority()
             $iSuccessCount += 1
         Else
             $iFailureCount += 1
-            _LogMessage("Failed to set priority for process '" & $sProcessName & "' (PID: " & $iPID & ") (Error: " & @error & ")", "ProcessPriority", 0)
+            _LogMessage("Failed to set priority for process '" & $sProcessName & "' (PID: " & $iPID & ") (Error: " & @error & ")", $LOG_TYPE_PROCESS_PRIORITY, $LOG_LEVEL_ERROR)
         EndIf
     Next
 
     If $iSuccessCount > 0 Then
-        _LogMessage("Successfully set priority to " & $sPriorityName & " for " & $iSuccessCount & " instance(s) of process '" & $sProcessName & "'.", "ProcessPriority", 1)
+        _LogMessage("Successfully set priority to " & $sPriorityName & " for " & $iSuccessCount & " instance(s) of process '" & $sProcessName & "'.", $LOG_TYPE_PROCESS_PRIORITY, $LOG_LEVEL_INFO)
     EndIf
     If $iFailureCount > 0 Then
-        _LogMessage("Failed to set priority for " & $iFailureCount & " instance(s) of process '" & $sProcessName & "'. See log for details.", "ProcessPriority", 0)
+        _LogMessage("Failed to set priority for " & $iFailureCount & " instance(s) of process '" & $sProcessName & "'. See log for details.", $LOG_TYPE_PROCESS_PRIORITY, $LOG_LEVEL_ERROR)
     EndIf
 
     Local $sMsg = "Priority set to " & $sPriorityName & " for " & $iSuccessCount & " instance(s) of '" & $sProcessName & "'."
@@ -341,20 +372,20 @@ Func LockProcessPriority()
     ; --- Step 1: Collect and validate PID ---
     Local $sRawPID = InputBox("Priority Watchdog", "Enter the Process ID (PID) to monitor:" & @CRLF & @CRLF & "Must be a positive integer of a currently running process.")
     If @error Then
-        _LogMessage("LockProcessPriority: Cancelled by user at PID prompt.", "PriorityWatchdog", 1)
+        _LogMessage("LockProcessPriority: Cancelled by user at PID prompt.", $LOG_TYPE_PRIORITY_WATCHDOG, $LOG_LEVEL_INFO)
         Return
     EndIf
 
     If Not StringIsDigit($sRawPID) Or Number($sRawPID) <= 0 Then
         _TrayNotify("Invalid PID. Must be a positive whole number.")
-        _LogMessage("LockProcessPriority: Invalid PID entered: '" & $sRawPID & "'", "PriorityWatchdog", 0)
+        _LogMessage("LockProcessPriority: Invalid PID entered: '" & $sRawPID & "'", $LOG_TYPE_PRIORITY_WATCHDOG, $LOG_LEVEL_ERROR)
         Return
     EndIf
 
     Local $iPID = Int($sRawPID)
     If Not ProcessExists($iPID) Then
         _TrayNotify("PID " & $iPID & " does not exist.")
-        _LogMessage("LockProcessPriority: PID " & $iPID & " does not exist.", "PriorityWatchdog", 0)
+        _LogMessage("LockProcessPriority: PID " & $iPID & " does not exist.", $LOG_TYPE_PRIORITY_WATCHDOG, $LOG_LEVEL_ERROR)
         Return
     EndIf
 
@@ -362,36 +393,37 @@ Func LockProcessPriority()
     For $i = 0 To UBound($aPriorityWatchPIDs) - 1
         If $aPriorityWatchPIDs[$i] = $iPID Then
             _TrayNotify("PID " & $iPID & " is already being monitored.")
-            _LogMessage("LockProcessPriority: PID " & $iPID & " is already in the watchlist.", "PriorityWatchdog", 1)
+            _LogMessage("LockProcessPriority: PID " & $iPID & " is already in the watchlist.", $LOG_TYPE_PRIORITY_WATCHDOG, $LOG_LEVEL_INFO)
             Return
         EndIf
     Next
 
     ; --- Step 2: Collect and validate priority ---
+    ; Valid range: $AUTOIT_PRIORITY_IDLE (0) through $AUTOIT_PRIORITY_REALTIME (5)
     Local $sPriorityPrompt = "Select target priority for PID " & $iPID & ":" & @CRLF & @CRLF & _
-            "0 = Idle" & @CRLF & _
-            "1 = Below Normal" & @CRLF & _
-            "2 = Normal" & @CRLF & _
-            "3 = Above Normal" & @CRLF & _
-            "4 = High" & @CRLF & _
-            "5 = Real-time  (use with extreme caution)"
+            $AUTOIT_PRIORITY_IDLE         & " = Idle" & @CRLF & _
+            $AUTOIT_PRIORITY_BELOW_NORMAL & " = Below Normal" & @CRLF & _
+            $AUTOIT_PRIORITY_NORMAL       & " = Normal" & @CRLF & _
+            $AUTOIT_PRIORITY_ABOVE_NORMAL & " = Above Normal" & @CRLF & _
+            $AUTOIT_PRIORITY_HIGH         & " = High" & @CRLF & _
+            $AUTOIT_PRIORITY_REALTIME     & " = Real-time  (use with extreme caution)"
 
-    Local $sRawPriority = InputBox("Priority Watchdog", $sPriorityPrompt, "2")
+    Local $sRawPriority = InputBox("Priority Watchdog", $sPriorityPrompt, String($AUTOIT_PRIORITY_NORMAL))
     If @error Then
-        _LogMessage("LockProcessPriority: Cancelled by user at priority prompt for PID " & $iPID & ".", "PriorityWatchdog", 1)
+        _LogMessage("LockProcessPriority: Cancelled by user at priority prompt for PID " & $iPID & ".", $LOG_TYPE_PRIORITY_WATCHDOG, $LOG_LEVEL_INFO)
         Return
     EndIf
 
     If Not StringIsDigit($sRawPriority) Then
         _TrayNotify("Invalid input. Enter a number from 0 to 5.")
-        _LogMessage("LockProcessPriority: Non-numeric priority input '" & $sRawPriority & "' for PID " & $iPID & ".", "PriorityWatchdog", 0)
+        _LogMessage("LockProcessPriority: Non-numeric priority input '" & $sRawPriority & "' for PID " & $iPID & ".", $LOG_TYPE_PRIORITY_WATCHDOG, $LOG_LEVEL_ERROR)
         Return
     EndIf
 
     Local $iPriorityConst = Int($sRawPriority)
-    If $iPriorityConst < 0 Or $iPriorityConst > 5 Then
+    If $iPriorityConst < $AUTOIT_PRIORITY_IDLE Or $iPriorityConst > $AUTOIT_PRIORITY_REALTIME Then
         _TrayNotify("Priority must be 0 through 5.")
-        _LogMessage("LockProcessPriority: Priority out of range: " & $iPriorityConst & " for PID " & $iPID & ".", "PriorityWatchdog", 0)
+        _LogMessage("LockProcessPriority: Priority out of range: " & $iPriorityConst & " for PID " & $iPID & ".", $LOG_TYPE_PRIORITY_WATCHDOG, $LOG_LEVEL_ERROR)
         Return
     EndIf
 
@@ -400,13 +432,13 @@ Func LockProcessPriority()
     ; --- Step 3: TOCTOU re-check then apply priority immediately ---
     If Not ProcessExists($iPID) Then
         _TrayNotify("PID " & $iPID & " exited before priority could be set.")
-        _LogMessage("LockProcessPriority: PID " & $iPID & " exited between input and initial set.", "PriorityWatchdog", 1)
+        _LogMessage("LockProcessPriority: PID " & $iPID & " exited between input and initial set.", $LOG_TYPE_PRIORITY_WATCHDOG, $LOG_LEVEL_INFO)
         Return
     EndIf
 
     If Not ProcessSetPriority($iPID, $iPriorityConst) Then
         _TrayNotify("Failed to set priority for PID " & $iPID & ". See log.")
-        _LogMessage("LockProcessPriority: ProcessSetPriority failed for PID " & $iPID & " (Error: " & @error & ")", "PriorityWatchdog", 0)
+        _LogMessage("LockProcessPriority: ProcessSetPriority failed for PID " & $iPID & " (Error: " & @error & ")", $LOG_TYPE_PRIORITY_WATCHDOG, $LOG_LEVEL_ERROR)
         Return
     EndIf
 
@@ -419,7 +451,7 @@ Func LockProcessPriority()
     If $bWasEmpty Then AdlibRegister("_PriorityWatchdog", $PRIORITY_WATCHDOG_MS)
 
     _TrayNotify("Watching PID " & $iPID & " -> " & $sPriorityName)
-    _LogMessage("LockProcessPriority: Watchdog started — PID " & $iPID & " → " & $sPriorityName & " (" & UBound($aPriorityWatchPIDs) & " PID(s) now monitored)", "PriorityWatchdog", 1)
+    _LogMessage("LockProcessPriority: Watchdog started — PID " & $iPID & " → " & $sPriorityName & " (" & UBound($aPriorityWatchPIDs) & " PID(s) now monitored)", $LOG_TYPE_PRIORITY_WATCHDOG, $LOG_LEVEL_INFO)
 EndFunc   ;==>LockProcessPriority
 
 ; ---------------------------------------------------------------------------
@@ -439,19 +471,19 @@ Func _PriorityWatchdog()
             _ArrayDelete($aPriorityWatchTargets, $i)
             _ArrayDelete($aPriorityWatchNames, $i)
             _TrayNotify("PID " & $iPID & " exited - watchdog stopped.")
-            _LogMessage("_PriorityWatchdog: PID " & $iPID & " no longer exists. Removed from watchlist (" & UBound($aPriorityWatchPIDs) & " PID(s) remaining)", "PriorityWatchdog", 1)
+            _LogMessage("_PriorityWatchdog: PID " & $iPID & " no longer exists. Removed from watchlist (" & UBound($aPriorityWatchPIDs) & " PID(s) remaining)", $LOG_TYPE_PRIORITY_WATCHDOG, $LOG_LEVEL_INFO)
             ContinueLoop
         EndIf
 
         Local $iCurrentConst = _GetProcessPriorityByPID($iPID)
         If $iCurrentConst = -1 Then
-            _LogMessage("_PriorityWatchdog: Could not read priority for PID " & $iPID & ". Deferring check to next tick.", "PriorityWatchdog", 0)
+            _LogMessage("_PriorityWatchdog: Could not read priority for PID " & $iPID & ". Deferring check to next tick.", $LOG_TYPE_PRIORITY_WATCHDOG, $LOG_LEVEL_ERROR)
             ContinueLoop
         EndIf
 
         If $iCurrentConst <> $iPriorityConst Then
             Local $sCurrentName = _PriorityConstantToName($iCurrentConst)
-            _LogMessage("_PriorityWatchdog: Priority drift on PID " & $iPID & " — detected " & $sCurrentName & ", expected " & $sPriorityName & ". Restoring.", "PriorityWatchdog", 1)
+            _LogMessage("_PriorityWatchdog: Priority drift on PID " & $iPID & " — detected " & $sCurrentName & ", expected " & $sPriorityName & ". Restoring.", $LOG_TYPE_PRIORITY_WATCHDOG, $LOG_LEVEL_INFO)
 
             ; TOCTOU re-check before restore
             If Not ProcessExists($iPID) Then
@@ -459,22 +491,22 @@ Func _PriorityWatchdog()
                 _ArrayDelete($aPriorityWatchTargets, $i)
                 _ArrayDelete($aPriorityWatchNames, $i)
                 _TrayNotify("PID " & $iPID & " exited - watchdog stopped.")
-                _LogMessage("_PriorityWatchdog: PID " & $iPID & " exited between drift detection and restore attempt.", "PriorityWatchdog", 1)
+                _LogMessage("_PriorityWatchdog: PID " & $iPID & " exited between drift detection and restore attempt.", $LOG_TYPE_PRIORITY_WATCHDOG, $LOG_LEVEL_INFO)
                 ContinueLoop
             EndIf
 
             If ProcessSetPriority($iPID, $iPriorityConst) Then
                 _TrayNotify("PID " & $iPID & " restored to " & $sPriorityName)
-                _LogMessage("_PriorityWatchdog: Successfully restored PID " & $iPID & " → " & $sPriorityName, "PriorityWatchdog", 1)
+                _LogMessage("_PriorityWatchdog: Successfully restored PID " & $iPID & " → " & $sPriorityName, $LOG_TYPE_PRIORITY_WATCHDOG, $LOG_LEVEL_INFO)
             Else
-                _LogMessage("_PriorityWatchdog: ProcessSetPriority failed on restore for PID " & $iPID & " (Error: " & @error & ")", "PriorityWatchdog", 0)
+                _LogMessage("_PriorityWatchdog: ProcessSetPriority failed on restore for PID " & $iPID & " (Error: " & @error & ")", $LOG_TYPE_PRIORITY_WATCHDOG, $LOG_LEVEL_ERROR)
             EndIf
         EndIf
     Next
 
     If UBound($aPriorityWatchPIDs) = 0 Then
         AdlibUnRegister("_PriorityWatchdog")
-        _LogMessage("_PriorityWatchdog: Watchlist empty. AdlibUnRegister called.", "PriorityWatchdog", 1)
+        _LogMessage("_PriorityWatchdog: Watchlist empty. AdlibUnRegister called.", $LOG_TYPE_PRIORITY_WATCHDOG, $LOG_LEVEL_INFO)
     EndIf
 EndFunc   ;==>_PriorityWatchdog
 
@@ -496,7 +528,7 @@ Func _GetProcessPriorityByPID($iPID)
     Local $aOpen = DllCall("kernel32.dll", "handle", "OpenProcess", "dword", $PROCESS_QUERY_LIMITED_INFORMATION, "bool", False, "dword", $iPID)
     If @error Or Not $aOpen[0] Then
         Local $iOpenWinErr = _WinAPI_GetLastError()
-        _LogMessage("_GetProcessPriorityByPID: OpenProcess failed for PID " & $iPID & " (DllError: " & @error & ", WinError: " & $iOpenWinErr & ")", "PriorityWatchdog", 0)
+        _LogMessage("_GetProcessPriorityByPID: OpenProcess failed for PID " & $iPID & " (DllError: " & @error & ", WinError: " & $iOpenWinErr & ")", $LOG_TYPE_PRIORITY_WATCHDOG, $LOG_LEVEL_ERROR)
         Return -1
     EndIf
 
@@ -506,7 +538,7 @@ Func _GetProcessPriorityByPID($iPID)
     DllCall("kernel32.dll", "bool", "CloseHandle", "handle", $aOpen[0])
 
     If $iDllError Or Not $aResult[0] Then
-        _LogMessage("_GetProcessPriorityByPID: GetPriorityClass failed for PID " & $iPID & " (DllError: " & $iDllError & ", WinError: " & $iWinError & ")", "PriorityWatchdog", 0)
+        _LogMessage("_GetProcessPriorityByPID: GetPriorityClass failed for PID " & $iPID & " (DllError: " & $iDllError & ", WinError: " & $iWinError & ")", $LOG_TYPE_PRIORITY_WATCHDOG, $LOG_LEVEL_ERROR)
         Return -1
     EndIf
 
@@ -521,17 +553,17 @@ EndFunc   ;==>_GetProcessPriorityByPID
 Func _WinAPIPriorityClassToAutoItConst($iWinAPIClass)
     Switch $iWinAPIClass
         Case $IDLE_PRIORITY_CLASS          ; 0x00000040
-            Return $PROCESS_IDLE           ; 0
+            Return $AUTOIT_PRIORITY_IDLE         ; 0
         Case $BELOW_NORMAL_PRIORITY_CLASS  ; 0x00004000
-            Return $PROCESS_BELOWNORMAL    ; 1
+            Return $AUTOIT_PRIORITY_BELOW_NORMAL ; 1
         Case $NORMAL_PRIORITY_CLASS        ; 0x00000020
-            Return $PROCESS_NORMAL         ; 2
+            Return $AUTOIT_PRIORITY_NORMAL       ; 2
         Case $ABOVE_NORMAL_PRIORITY_CLASS  ; 0x00008000
-            Return $PROCESS_ABOVENORMAL    ; 3
+            Return $AUTOIT_PRIORITY_ABOVE_NORMAL ; 3
         Case $HIGH_PRIORITY_CLASS          ; 0x00000080
-            Return $PROCESS_HIGH           ; 4
+            Return $AUTOIT_PRIORITY_HIGH         ; 4
         Case $REALTIME_PRIORITY_CLASS      ; 0x00000100
-            Return $PROCESS_REALTIME       ; 5
+            Return $AUTOIT_PRIORITY_REALTIME     ; 5
         Case Else
             Return -1   ; unrecognised priority class
     EndSwitch
@@ -543,17 +575,17 @@ EndFunc   ;==>_WinAPIPriorityClassToAutoItConst
 ; ---------------------------------------------------------------------------
 Func _PriorityConstantToName($iPriorityConst)
     Switch $iPriorityConst
-        Case $PROCESS_IDLE
+        Case $AUTOIT_PRIORITY_IDLE
             Return "Idle"
-        Case $PROCESS_BELOWNORMAL
+        Case $AUTOIT_PRIORITY_BELOW_NORMAL
             Return "Below Normal"
-        Case $PROCESS_NORMAL
+        Case $AUTOIT_PRIORITY_NORMAL
             Return "Normal"
-        Case $PROCESS_ABOVENORMAL
+        Case $AUTOIT_PRIORITY_ABOVE_NORMAL
             Return "Above Normal"
-        Case $PROCESS_HIGH
+        Case $AUTOIT_PRIORITY_HIGH
             Return "High"
-        Case $PROCESS_REALTIME
+        Case $AUTOIT_PRIORITY_REALTIME
             Return "Real-time"
         Case Else
             Return "Unknown (" & $iPriorityConst & ")"
@@ -579,26 +611,26 @@ EndFunc   ;==>_ClearTrayNotify
 #EndRegion ;traytips
 
 ; ---------------------------------------------------------------------------
-; Func _miscpopups
+; Func _MiscPopups
 ; Closes known application registration dialogs.
 ; Specific to author's system — disable by commenting out the call in ToggleScript.
 ; ---------------------------------------------------------------------------
-Func _miscpopups()
+Func _MiscPopups()
     If WinExists("[CLASS:TPleaseRegisterForm]") Then
-        _LogMessage("Closing AdvancedRenamer popup (TPleaseRegisterForm)", "System", 1)
+        _LogMessage("Closing AdvancedRenamer popup (TPleaseRegisterForm)", $LOG_TYPE_SYSTEM, $LOG_LEVEL_INFO)
         WinClose("[CLASS:TPleaseRegisterForm]")
     ElseIf WinExists("This is an unregistered copy", "") Then
         WinClose("This is an unregistered copy", "")
-        _LogMessage("Closing Sublime Text unregistered-copy popup", "System", 1)
+        _LogMessage("Closing Sublime Text unregistered-copy popup", $LOG_TYPE_SYSTEM, $LOG_LEVEL_INFO)
     EndIf
-EndFunc   ;==>_miscpopups
+EndFunc   ;==>_MiscPopups
 
 ; ---------------------------------------------------------------------------
-; Func _exit
+; Func _Exit
 ; Hotkey: ScrollLock+Pause — terminates the script immediately.
 ; ---------------------------------------------------------------------------
-Func _exit()
-    _LogMessage("Script termination requested", "System", 1)
-    _LogMessage("Script Was Terminated by _exit()", "System", 1)
+Func _Exit()
+    _LogMessage("Script termination requested", $LOG_TYPE_SYSTEM, $LOG_LEVEL_INFO)
+    _LogMessage("Script Was Terminated by _Exit()", $LOG_TYPE_SYSTEM, $LOG_LEVEL_INFO)
     Exit
-EndFunc   ;==>_exit
+EndFunc   ;==>_Exit
