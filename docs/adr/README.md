@@ -19,8 +19,8 @@ and what alternatives were rejected.
 | 0007 | AutoIt Priority Constants Canonical | Accepted | — | Process priorities are stored and compared internally as AutoIt integers (0–5); Windows API hex priority class values are converted to AutoIt integers once at the read boundary via `_WinAPIPriorityClassToAutoItConst`. |
 | 0008 | Direct DllCall to advapi32.dll | Accepted | — | `ServiceManager.au3` calls SCM APIs (`OpenSCManagerW`, `OpenServiceW`, `QueryServiceStatus`, `ControlService`, `CloseServiceHandle`) directly via `DllCall` rather than AutoIt built-ins or `_WinAPI_*` wrappers, to access the full `SERVICE_STATUS` struct and capture `@error` reliably. |
 | 0009 | QueryServiceStatus API Selection | Accepted | — | `QueryServiceStatus` with the 7-DWORD `SERVICE_STATUS` struct is used throughout instead of `QueryServiceStatusEx` / `SERVICE_STATUS_PROCESS`, because the batch-stop algorithm only needs `dwCurrentState` and `ControlService` already requires the same 7-DWORD struct. |
-| 0010 | *(see ADR file)* | Accepted | — | *(added after T3-08 validation — see `0010-*.md`)* |
-| 0011 | ServiceControl/ServiceManager boundary convention | Accepted | 2026-11-12 | Convention-only separation: stop operations in ServiceManager.au3 only |
+| 0010 | Main loop sleep timing: 50 ms passive, 500 ms active | Accepted | — | The passive `While 1 / Sleep(50) / WEnd` loop retains 50 ms for hotkey/tray responsiveness; the active monitoring loop inside `ToggleScript()` uses `Sleep($MAIN_LOOP_SLEEP_MS)` where `$MAIN_LOOP_SLEEP_MS = 500`, sufficient to wake well within the coarsest 2 s timer gate while reducing CPU load ~10x. |
+| 0011 | ServiceControl/ServiceManager boundary is convention-only | Accepted | 2026-11-12 | AutoIt has no namespace system; both files share a flat symbol space. The rule — all stop operations on the monitoring hot path go through `_SM_StopServicesBatch`; `_StopService` is deprecated but not removed — is enforced by documentation and code review only, not by the compiler or AU3Check. |
 
 ---
 
@@ -90,9 +90,22 @@ used at every query site. `QueryServiceStatusEx` does not appear anywhere in
 `ServiceManager.au3`. `dwCurrentState` is read as struct field 2 (`DllStructGetData($t, 2)`)
 in both Phase 1 and the Phase 2 poll loop.
 
-**Note:** ADR-0010 and ADR-0011 were added after the T3-08 validation pass (which covered
-ADRs 0001–0009, all passing). These two ADRs have not yet been cross-checked against the
-codebase.
+**ADR-0010 — Main loop sleep timing**
+PASS. `Stop Services Processes.au3` line 140: `Sleep(50)` in the passive `While 1 / WEnd`
+main loop. Line 44: `Global Const $MAIN_LOOP_SLEEP_MS = 500` in the Timing constants region.
+Line 167: `Sleep($MAIN_LOOP_SLEEP_MS)` at the bottom of the active monitoring `While $bScriptRunning`
+loop inside `ToggleScript()`, after the `_KillProcessList` / `_RunServiceBatchStop` timer checks
+and before `_MiscPopups()`. Both values match the ADR exactly. The two loops are structurally
+distinct: the passive loop is at file scope; the active loop is nested inside `ToggleScript`.
+
+**ADR-0011 — ServiceControl/ServiceManager boundary convention**
+PASS. `Includes/ServiceControl.au3` lines 158–207: `_StopService` is present and intact
+(deprecated, not removed). `Stop Services Processes.au3` line 17 comment confirms
+"`_StopService` in ServiceControl.au3 is NO LONGER called; use `_SM_StopServicesBatch`."
+`_RunServiceBatchStop` (lines 229–255 of the main script) is the sole stop-operation caller
+and routes exclusively through `_SM_StopServicesBatch`. All service-manager functions and
+constants in `ServiceManager.au3` carry the `_SM_` / `$SM_` prefix. No stop-operation logic
+was added to `ServiceControl.au3`. The convention-only boundary is intact.
 
 ---
 

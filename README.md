@@ -52,9 +52,12 @@ The script automatically terminates the following processes:
 - `TCPSVCS.EXE`
 - `TrustedInstaller.exe` - To Prevent Automated Software Installs (Applies to mal-ware prevention)
 - `update.exe` - To Prevent Automated Software Installs (Applies to mal-ware prevention)
+- `UserOOBEBroker.exe`
+- `backgroundTaskHost.exe`
+- `xgamehelper.exe` (appears at index 15 and 16 — preserved duplicate; second close is a harmless no-op)
 
 ### Services
-The script stops the following 9 services each cycle (every 10 seconds) via `_SM_StopServicesBatch()` in `Includes/ServiceManager.au3`:
+The script stops the following 9 services each cycle (every 10 seconds) via `_SM_StopServicesBatch()` in `Includes/ServiceManager.au3`. Process kill cycle: every 2 seconds.
 - `FDResPub` (Function Discovery Resource Publication)
 - `fdPHost` (Function Discovery Provider Host)
 - `TrustedInstaller` - To Prevent Automated Software Installs (Applies to mal-ware prevention)
@@ -86,7 +89,7 @@ The batch-stop module opens the Windows Service Control Manager (SCM) once per c
 
 4. **Log File**: (Optional) Edit `Global $sLogFile` to your preferred log file location. The default is `%HOMEDRIVE%\login\closure_log.txt`.
 
-5. **Processes and Services**: (Optional) Customize the `$sProcesses` array (process termination list) or the service array inside `_RunServiceBatchStop()` to manage different processes or services.
+5. **Processes and Services**: (Optional) Customize the `$sProcesses` array (process termination list) or edit `$aSvcTargetNames` in the `#Region ;Configuration — Target lists` block near the top of `Stop Services Processes.au3` to manage different processes or services.
 
 6. **Logging Configuration**: (Optional)
    - Adjust `$iLogLevel` (0=Errors only, 1=Basic logging, 2=Detailed logging).

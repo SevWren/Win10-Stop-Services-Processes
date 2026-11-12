@@ -15,11 +15,11 @@ REVIEW-Stop-Services-Processes.au3.md, REVIEW-ServiceManager.Tests.au3.md).
 
 ---
 
-## Standards Axis
+## Standards
 
 ### S-01 — MINOR — Naming Constant Drift: GLOSSARY vs Implementation (Two-File Shotgun Surgery)
 
-**Smell**: Shotgun Surgery / Mysterious Name.
+**Smell**: Shotgun Surgery / Mysterious Name (judgement call).
 
 The `GLOSSARY.md` Timing Constants section (lines 68, 70) names two constants differently from their actual
 declarations in `Stop Services Processes.au3` and `docs/ARCHITECTURE.md`:
@@ -41,11 +41,13 @@ six timing constants in GLOSSARY are out of sync.
 `$SVC_BATCH_POLL_MS`), or rename the implementation constants to match GLOSSARY — whichever direction
 the team prefers, applied to all three files in one pass.
 
+**RESOLVED:** by T2-11 (GLOSSARY rewritten with no variable names).
+
 ---
 
 ### S-02 — MINOR — CLAUDE.md / Implementation Timing Mismatch (_TrayNotify auto-clear delay)
 
-**Smell**: Mysterious Name (documentation that misleads).
+**Smell**: Mysterious Name (judgement call) (documentation that misleads).
 
 `CLAUDE.md` (Coding Conventions, User Notifications section) states `_TrayNotify` auto-clears "after
 3 seconds via `AdlibRegister("_ClearTrayNotify", 3000)`". The delivered implementation at main script
@@ -59,11 +61,13 @@ canonical reference document (CLAUDE.md) still documents 3000 ms and was not upd
 **Fix**: Update `CLAUDE.md` to state 2 seconds (2000 ms), since the T04 resolution confirmed 2 s is
 the intended behavior.
 
+**RESOLVED:** by FIX-CLAUDE.
+
 ---
 
 ### S-03 — MINOR — `CheckElapsedTime` Missing Underscore Prefix (Pre-existing, Not Regressed)
 
-**Smell**: Mysterious Name (naming convention inconsistency).
+**Smell**: Mysterious Name (judgement call) (naming convention inconsistency).
 
 `CODING_STANDARDS.md` specifies internal/private functions use `_UnderscorePascalCase`. `CheckElapsedTime`
 (main script line 255) is a private helper called only from within `ToggleScript` and is not a hotkey
@@ -129,7 +133,7 @@ within a single file and does not create cross-module coupling, so it remains IN
 
 ---
 
-### Standards Axis Summary
+### Standards Summary
 
 | ID | Severity | Description |
 |---|---|---|
@@ -149,7 +153,7 @@ for two of the six timing constants across three documentation files.
 
 ---
 
-## Spec Axis
+## Spec
 
 ### SP-01 — PASS — Core Engineering Mission Fulfilled: Verifiable Batch Service Stop
 
@@ -230,6 +234,8 @@ checklist item "Update README.md"; README.md service management description vs n
 **Fix**: Update README to state: 9-service inventory (list them), 10 s service polling cycle, that
 the include paths are now working-directory-relative, and that per-service outcomes are logged.
 
+**RESOLVED:** by T1-10.
+
 ---
 
 ### SP-06 — MINOR — Architecture Doc Has One Stale Internal-Helper Signature (Partially Resolved)
@@ -279,7 +285,7 @@ contributor removing what appear to be dead-code helpers.
 
 ---
 
-### Spec Axis Summary
+### Spec Summary
 
 | ID | Severity | Description |
 |---|---|---|

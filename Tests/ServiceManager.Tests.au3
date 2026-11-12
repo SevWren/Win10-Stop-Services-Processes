@@ -90,14 +90,8 @@
 #Region ;Includes
 #include <AutoItConstants.au3>
 #include <MsgBoxConstants.au3>
+#include "Includes\ServiceManager.au3"
 #EndRegion
-
-; ---------------------------------------------------------------------------
-; Service state and outcome constants are defined in ServiceManager.au3.
-; They are NOT redeclared here to avoid Global Const redefinition conflicts
-; under AU3Check -w 3 / -w 4. The #include at the bottom of this file
-; (after all Func definitions) makes them available at call time.
-; ---------------------------------------------------------------------------
 
 ; Win32 error codes used in tests
 Global Const $ERR_ACCESS_DENIED         = 5
@@ -193,7 +187,7 @@ Func _Test_Win32ErrToOutcome()
     ConsoleWrite(@CRLF & "--- _SM_Win32ErrToOutcome ---" & @CRLF)
 
     ; ControlService error 1062 = NOT_ACTIVE → service was not started → ALREADY_STOPPED
-    _TestAssert("win32 1062 → ALREADY_STOPPED", _SM_Win32ErrToOutcome(1062) = $SM_OUTCOME_ALREADY, $SM_OUTCOME_ALREADY, _SM_Win32ErrToOutcome(1062))
+    _TestAssert("win32 1062 → ALREADY_STOPPED", _SM_Win32ErrToOutcome(1062) = $SM_OUTCOME_ALREADY_STOPPED, $SM_OUTCOME_ALREADY_STOPPED, _SM_Win32ErrToOutcome(1062))
 
     ; ControlService error 5 = ACCESS_DENIED → FAILED
     _TestAssert("win32 5 → FAILED",             _SM_Win32ErrToOutcome(5) = $SM_OUTCOME_FAILED,   $SM_OUTCOME_FAILED, _SM_Win32ErrToOutcome(5))
@@ -332,9 +326,9 @@ Func _Test_SharedTimeout()
     ; Simulate: service[0] stopped before deadline, service[1] did not
     Local $aResults[2][6]
     $aResults[0][0] = "DoSvc"     : $aResults[0][3] = $SM_OUTCOME_STOPPED
-    $aResults[1][0] = "TrustedInstaller" : $aResults[1][3] = $SM_OUTCOME_TIMEDOUT : $aResults[1][2] = 3  ; STOP_PENDING
+    $aResults[1][0] = "TrustedInstaller" : $aResults[1][3] = $SM_OUTCOME_TIMED_OUT : $aResults[1][2] = 3  ; STOP_PENDING
 
-    _TestAssert("timed-out service: outcome = TIMED_OUT",   $aResults[1][3] = $SM_OUTCOME_TIMEDOUT, $SM_OUTCOME_TIMEDOUT, $aResults[1][3])
+    _TestAssert("timed-out service: outcome = TIMED_OUT",   $aResults[1][3] = $SM_OUTCOME_TIMED_OUT, $SM_OUTCOME_TIMED_OUT, $aResults[1][3])
     _TestAssert("timed-out service: finalState = STOP_PENDING (3)", $aResults[1][2] = 3, "3", String($aResults[1][2]))
     _TestAssert("other service: outcome = STOPPED",         $aResults[0][3] = $SM_OUTCOME_STOPPED, $SM_OUTCOME_STOPPED, $aResults[0][3])
 EndFunc
@@ -496,8 +490,6 @@ EndFunc
 ; ---------------------------------------------------------------------------
 ; Main: run all tests
 ; ---------------------------------------------------------------------------
-
-#include "Includes\ServiceManager.au3"
 
 ConsoleWrite("ServiceManager.Tests.au3 — deterministic test harness" & @CRLF)
 ConsoleWrite("No live service stop controls are issued in this harness." & @CRLF)

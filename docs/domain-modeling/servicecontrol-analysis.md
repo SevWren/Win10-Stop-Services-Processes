@@ -104,6 +104,10 @@ The reasons for supersession are documented in ADR-0001:
 `_StopService` is **retained in the file** and not deleted, because there may be callers
 outside this codebase. It must not be called on the monitoring hot path.
 
+A deprecation notice has been added to the `_StopService` function header by WORK-01,
+directing callers to `_SM_StopServicesBatch` for all stop operations on the monitoring hot
+path.
+
 ### Functions that remain useful
 
 All other `ServiceControl.au3` functions remain on the active path and have no equivalent
@@ -165,9 +169,10 @@ Under `AU3Check -q -d -w 1 -w 2 -w 3 -w 4` (the project's configured flags):
 
 - The `"long"` handle-type usage described above will not produce a compiler warning —
   AU3Check does not validate DllCall type strings.
-- The file lacks `#include-once`, which means including it twice in one compilation unit
-  would redefine all global constants and trigger AU3Check duplicate-declaration warnings.
-  `ServiceManager.au3` correctly includes `#include-once`.
+- ~~The file lacks `#include-once`~~ — RESOLVED by FIX-03: `#include-once` added as line 1.
+- ~~All 51 constant declarations used bare `Global` rather than `Global Const`, leaving them
+  mutable and producing no AU3Check protection against accidental reassignment~~ — RESOLVED
+  by WORK-01: all 51 constants converted to `Global Const`.
 - The `$STANDARD_RIGHTS_REQUIRED2` constant name has a trailing `2` to avoid a collision
   with a constant of the same base name elsewhere. This is a naming workaround, not a
   functional issue, but it is a source of confusion.

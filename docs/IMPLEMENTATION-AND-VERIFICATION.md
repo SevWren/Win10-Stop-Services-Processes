@@ -165,6 +165,9 @@ All touched paths are now portable. Moving the project directory requires no sou
 | REQ-012 | IMPLEMENTED | Duplicate includes/HotKeySets removed; T05 review STD-03/STD-04 |
 | REQ-013 | IMPLEMENTED | `$SVC_POLL_INTERVAL_SEC = 10`; T05 review SPEC-04 |
 | REQ-014 | IMPLEMENTED | Relative include/build paths; T05 review SPEC-05 |
+| REQ-015 | IMPLEMENTED | `$SVC_BATCH_POLL_MS = 500` in config region; `Sleep($iPollIntervalMs)` in Phase 2 of `_SM_StopServicesBatch` |
+| REQ-016 | IMPLEMENTED | `$SVC_BATCH_TIMEOUT_MS = 20000` in config region; `TimerDiff($iTimer) < $iBatchTimeoutMs` guard in Phase 2 |
+| REQ-017 | IMPLEMENTED | Decision recorded in `docs/adr/0009-queryservicestatus-api-selection.md`; 7-DWORD struct used throughout `ServiceManager.au3` |
 
 ---
 

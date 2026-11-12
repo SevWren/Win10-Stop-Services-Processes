@@ -16,7 +16,6 @@
 ;     → @error 1 if SCM cannot be opened (batch-level failure)
 ;
 ; INTERNAL HELPERS (not called from main script)
-;   _SM_GetServiceState($hService)
 ;   _SM_ServiceStateToString($iState)
 ;   _SM_Win32ErrToOutcome($iWin32Err)
 ;   _SM_IsStopEligible($iState)
@@ -53,10 +52,10 @@ Global Const $SM_STATE_PAUSED           = 7
 ; Outcome string constants
 ; ---------------------------------------------------------------------------
 Global Const $SM_OUTCOME_STOPPED        = "STOPPED"
-Global Const $SM_OUTCOME_ALREADY        = "ALREADY_STOPPED"
+Global Const $SM_OUTCOME_ALREADY_STOPPED_STOPPED = "ALREADY_STOPPED"
 Global Const $SM_OUTCOME_UNAVAILABLE    = "UNAVAILABLE"
 Global Const $SM_OUTCOME_FAILED         = "FAILED"
-Global Const $SM_OUTCOME_TIMEDOUT       = "TIMED_OUT"
+Global Const $SM_OUTCOME_TIMED_OUT      = "TIMED_OUT"
 
 ; ---------------------------------------------------------------------------
 ; Win32 error codes relevant to SCM operations
@@ -187,16 +186,16 @@ Func _SM_StopServicesBatch(ByRef $aServiceNames, $iBatchTimeoutMs = 20000, $iPol
     ; Parallel arrays: [pending service index in $aResults, service handle]
     Local $aPendingIdx[0]     ; index into $aResults
     Local $aPendingHnd[0]     ; corresponding service handle
+    ; $iPendLen declared at function scope — not inside the Phase 1 loop — so
+    ; AU3Check -w 3 does not emit a redeclaration-in-loop warning (BUG-02 fix).
+    ; Assigned before every read site inside the loop body below.
+    Local $iPendLen
 
     ; =========================================================================
     ; PHASE 1 — Inspect each service and issue stop controls without serial waiting
     ; =========================================================================
     For $i = 0 To $iCount - 1
         Local $sName = $aServiceNames[$i]
-        ; $iPendLen declared once per loop iteration; assigned (not re-declared) in both
-        ; pending-append branches below — eliminates the duplicate ReDim block and the
-        ; opaque $iPendLen2 name (CR-02 Duplicated Code / Mysterious Name fix).
-        Local $iPendLen
 
         ; Open service with query + stop rights
         ; Ref: https://learn.microsoft.com/en-us/windows/win32/api/winsvc/nf-winsvc-openservicew
@@ -244,7 +243,7 @@ Func _SM_StopServicesBatch(ByRef $aServiceNames, $iBatchTimeoutMs = 20000, $iPol
         If _SM_StateToAlreadyStopped($iInitState) Then
             ; Service is STOPPED — no control needed
             $aResults[$i][2] = $iInitState
-            $aResults[$i][3] = $SM_OUTCOME_ALREADY
+            $aResults[$i][3] = $SM_OUTCOME_ALREADY_STOPPED
             $aResults[$i][4] = 0
             _LogMessage("_SM_StopServicesBatch: already stopped: " & $sName, $LOG_TYPE_SERVICE, $LOG_LEVEL_VERBOSE)
             DllCall("advapi32.dll", "bool", "CloseServiceHandle", "handle", $hService)
@@ -289,7 +288,7 @@ Func _SM_StopServicesBatch(ByRef $aServiceNames, $iBatchTimeoutMs = 20000, $iPol
             $aResults[$i][2] = $iInitState
             $aResults[$i][3] = $sCtrlOutcome
             $aResults[$i][4] = $iCtrlWinErr
-            If $sCtrlOutcome = $SM_OUTCOME_ALREADY Then
+            If $sCtrlOutcome = $SM_OUTCOME_ALREADY_STOPPED Then
                 _LogMessage("_SM_StopServicesBatch: service not active (Win32=1062): " & $sName, $LOG_TYPE_SERVICE, $LOG_LEVEL_VERBOSE)
             Else
                 _LogMessage("_SM_StopServicesBatch: ControlService failed for " & $sName & " (Win32=" & $iCtrlWinErr & ")", $LOG_TYPE_SERVICE, $LOG_LEVEL_ERROR)
@@ -364,7 +363,7 @@ Func _SM_StopServicesBatch(ByRef $aServiceNames, $iBatchTimeoutMs = 20000, $iPol
     Local $iTimeoutIdx
     For $iTimeoutIdx = 0 To UBound($aPendingIdx) - 1
         Local $iTOIdx = $aPendingIdx[$iTimeoutIdx]
-        $aResults[$iTOIdx][3] = $SM_OUTCOME_TIMEDOUT
+        $aResults[$iTOIdx][3] = $SM_OUTCOME_TIMED_OUT
         $aResults[$iTOIdx][4] = 0
         $aResults[$iTOIdx][5] = "Deadline exceeded (" & $iBatchTimeoutMs & "ms)"
         _LogMessage("_SM_StopServicesBatch: stop timed out: " & $aResults[$iTOIdx][0], $LOG_TYPE_SERVICE, $LOG_LEVEL_ERROR)
@@ -378,36 +377,6 @@ Func _SM_StopServicesBatch(ByRef $aServiceNames, $iBatchTimeoutMs = 20000, $iPol
     Return $aResults
 
 EndFunc   ;==>_SM_StopServicesBatch
-
-; ---------------------------------------------------------------------------
-; Func _SM_GetServiceState
-;
-; Queries a single service handle's current state integer (1–7) using
-; QueryServiceStatus. Returns -1 on failure.
-;
-; Parameters:
-;   $hService — open service handle (must have SERVICE_QUERY_STATUS)
-;
-; Returns: integer 1–7, or -1 on error
-; @error: 0 = ok; 1 = DllCall failed or QueryServiceStatus returned FALSE
-;
-; Ref: https://learn.microsoft.com/en-us/windows/win32/api/winsvc/nf-winsvc-queryservicestatus
-; Ref: https://learn.microsoft.com/en-us/windows/win32/api/winsvc/ns-winsvc-service_status
-; ---------------------------------------------------------------------------
-Func _SM_GetServiceState($hService)
-    Local $tStatus = DllStructCreate("dword;dword;dword;dword;dword;dword;dword")
-    Local $aQuery = DllCall("advapi32.dll", "bool", "QueryServiceStatus", _
-            "handle", $hService, _
-            "ptr",    DllStructGetPtr($tStatus))
-    Local $iDllErr = @error    ; capture IMMEDIATELY
-    Local $iWinErr = _WinAPI_GetLastError()   ; before any other call
-    If $iDllErr Or Not $aQuery[0] Then
-        _LogMessage("_SM_GetServiceState: QueryServiceStatus failed (DllErr=" & $iDllErr & ", Win32=" & $iWinErr & ")", $LOG_TYPE_SERVICE, $LOG_LEVEL_ERROR)
-        SetError(1)
-        Return -1
-    EndIf
-    Return DllStructGetData($tStatus, 2)   ; field 2 = dwCurrentState
-EndFunc   ;==>_SM_GetServiceState
 
 ; ---------------------------------------------------------------------------
 ; Func _SM_ServiceStateToString
@@ -453,7 +422,7 @@ EndFunc   ;==>_SM_ServiceStateToString
 Func _SM_Win32ErrToOutcome($iWin32Err)
     Select
         Case $iWin32Err = $SM_ERR_NOT_ACTIVE      ; 1062 — service was not started
-            Return $SM_OUTCOME_ALREADY
+            Return $SM_OUTCOME_ALREADY_STOPPED
         Case $iWin32Err = $SM_ERR_SVC_NOT_EXIST   ; 1060 — does not exist
             Return $SM_OUTCOME_UNAVAILABLE
         Case Else

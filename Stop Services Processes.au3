@@ -34,7 +34,7 @@ HotKeySet("{ScrollLock}{PAUSE}", "_Exit")
 HotKeySet("+{F1}", "ToggleScript")       ; Shift+F1 — toggle monitoring loop on/off
 HotKeySet("+^9", "SetProcessPriority")   ; Ctrl+Shift+9 — set priority for all instances of a named process
 HotKeySet("^!+9", "LockProcessPriority") ; Ctrl+Alt+Shift+9 — lock a specific PID's priority and auto-restore on drift
-#EndRegion
+#EndRegion ;hotkeys
 
 #Region ;Timing constants
 ; Single definition point for all interval values.
@@ -45,7 +45,7 @@ Global Const $MAIN_LOOP_SLEEP_MS       = 500     ; active monitoring While loop 
 Global Const $PRIORITY_WATCHDOG_MS     = 10000   ; AdlibRegister interval for _PriorityWatchdog (ms)
 Global Const $SVC_BATCH_TIMEOUT_MS     = 20000   ; shared deadline for one batch-stop (ms)
 Global Const $SVC_BATCH_POLL_MS        = 500     ; poll sleep within batch-stop wait loop (ms)
-#EndRegion
+#EndRegion ;Timing constants
 
 #Region ;Configuration — Log constants
 ; $LOG_LEVEL_ERROR, $LOG_LEVEL_INFO, $LOG_LEVEL_VERBOSE and $LOG_TYPE_SYSTEM,
@@ -57,7 +57,7 @@ Global Const $SVC_BATCH_POLL_MS        = 500     ; poll sleep within batch-stop 
 Global Const $LOG_TYPE_PROCESS          = "Process"          ; process kill actions
 Global Const $LOG_TYPE_PROCESS_PRIORITY = "ProcessPriority"  ; one-shot priority set actions
 Global Const $LOG_TYPE_PRIORITY_WATCHDOG = "PriorityWatchdog" ; watchdog lifecycle and drift events
-#EndRegion
+#EndRegion ;Configuration — Log constants
 
 #Region ;Configuration — AutoIt process priority constants
 ; Named constants for the integer argument to ProcessSetPriority (0–5).
@@ -70,7 +70,7 @@ Global Const $AUTOIT_PRIORITY_NORMAL       = 2
 Global Const $AUTOIT_PRIORITY_ABOVE_NORMAL = 3
 Global Const $AUTOIT_PRIORITY_HIGH         = 4
 Global Const $AUTOIT_PRIORITY_REALTIME     = 5
-#EndRegion
+#EndRegion ;Configuration — AutoIt process priority constants
 
 #Region ;Configuration — Target lists
 ; Service Target List: Windows service names stopped every $SVC_POLL_INTERVAL_SEC seconds.
@@ -79,11 +79,10 @@ Global Const $AUTOIT_PRIORITY_REALTIME     = 5
 Global $aSvcTargetNames[9] = [ _
     "FDResPub", "fdPHost", "TrustedInstaller", "wuauserv", _
     "UsoSvc", "DoSvc", "WaaSMedicSvc", "SSDPSRV", "sppsvc"]
-#EndRegion
+#EndRegion ;Configuration — Target lists
 
 #Region ;Variables/Logging
 Global $sStringInstaller   = "In the _KillProcessList function and just terminated"
-Global $taskcloseran       = 0
 
 ; Process inventory — processes closed every $PROC_POLL_INTERVAL_SEC seconds.
 ; Note: "xgamehelper.exe" appears at index 15 and 16 (preserved as-is from baseline —
@@ -105,12 +104,12 @@ Global $sLogFile       = @HomeDrive & "\login\closure_log.txt"
 Global $iLogLevel      = $LOG_LEVEL_VERBOSE   ; ceiling: messages above this level are dropped
 Global $bLogToConsole  = True   ; mirrors output to SciTE console
 
-Global Const $PROCESS_IDLE = 0  ; not defined in this AutoIt version's AutoItConstants.au3
-
 ; Priority watchdog parallel arrays
 Global $aPriorityWatchPIDs[0]      ; PIDs under watchdog
 Global $aPriorityWatchTargets[0]   ; corresponding target AutoIt priority constants (0–5)
 Global $aPriorityWatchNames[0]     ; corresponding human-readable priority names
+
+Global $g_bLogBusy = False         ; re-entrancy guard for _LogMessage file I/O
 
 TraySetIcon($iconfile)
 ConsoleWrite("DEBUG: Starting log initialization." & @CRLF)
@@ -148,6 +147,7 @@ WEnd
 ; Hotkey: Shift+F1 — toggles the active monitoring loop on/off.
 ; ---------------------------------------------------------------------------
 Func ToggleScript()
+    HotKeySet("+{F1}")  ; temporarily disable this hotkey to prevent double-activation
     If $bScriptRunning Then
         _LogMessage("F1 pressed - Pausing script", $LOG_TYPE_SYSTEM, $LOG_LEVEL_INFO)
         MsgBox($MB_SYSTEMMODAL, "AutoIT Script", "Script paused!", 1)
@@ -170,6 +170,7 @@ Func ToggleScript()
         Sleep($MAIN_LOOP_SLEEP_MS)
         _MiscPopups()
     WEnd
+    HotKeySet("+{F1}", "ToggleScript")  ; re-enable hotkey
 EndFunc   ;==>ToggleScript
 
 ; ---------------------------------------------------------------------------
@@ -243,9 +244,9 @@ Func _RunServiceBatchStop()
         Select
             Case $sOutcome = $SM_OUTCOME_STOPPED
                 _LogMessage("Service stopped: " & $sSvcName, $LOG_TYPE_SERVICE, $LOG_LEVEL_INFO)
-            Case $sOutcome = $SM_OUTCOME_ALREADY
+            Case $sOutcome = $SM_OUTCOME_ALREADY_STOPPED
                 _LogMessage("Service already stopped: " & $sSvcName, $LOG_TYPE_SERVICE, $LOG_LEVEL_VERBOSE)
-            Case $sOutcome = $SM_OUTCOME_TIMEDOUT
+            Case $sOutcome = $SM_OUTCOME_TIMED_OUT
                 _LogMessage("Service stop timed out: " & $sSvcName, $LOG_TYPE_SERVICE, $LOG_LEVEL_ERROR)
             Case $sOutcome = $SM_OUTCOME_UNAVAILABLE
                 _LogMessage("Service not found: " & $sSvcName, $LOG_TYPE_SERVICE, $LOG_LEVEL_VERBOSE)
@@ -266,13 +267,18 @@ Func _LogMessage($sMessage, $sType, $iLevel)
     Local $sDateTime = _NowTime(12) & " " & @MDAY & "/" & @MON & "/" & @YEAR
     Local $sLogEntry = @CRLF & $sDateTime & " [" & $sType & "] " & $sMessage
 
+    If $g_bLogBusy Then Return
+    $g_bLogBusy = True
+
     Local $hFile = FileOpen($sLogFile, 1)   ; Mode 1 = Append
     If $hFile = -1 Then
+        $g_bLogBusy = False
         ConsoleWrite("ERROR in _LogMessage: Could not open log file '" & $sLogFile & "' for writing. @error code = " & @error & @CRLF)
         Return
     EndIf
     FileWrite($hFile, $sLogEntry)
     FileClose($hFile)
+    $g_bLogBusy = False
 
     If $bLogToConsole Then
         ConsoleWrite($sLogEntry & @CRLF)
@@ -444,9 +450,25 @@ Func LockProcessPriority()
 
     ; --- Step 4: Add to watchlist; register AdlibRegister only on first entry ---
     Local $bWasEmpty = (UBound($aPriorityWatchPIDs) = 0)
+    Local $iPrevLen = UBound($aPriorityWatchPIDs)
     _ArrayAdd($aPriorityWatchPIDs, $iPID)
+    If @error Then
+        _LogMessage("LockProcessPriority: failed to add PID " & $iPID & ". @error=" & @error, $LOG_TYPE_PRIORITY_WATCHDOG, $LOG_LEVEL_ERROR)
+        Return
+    EndIf
     _ArrayAdd($aPriorityWatchTargets, $iPriorityConst)
+    If @error Then
+        _LogMessage("LockProcessPriority: failed to add target. Rolling back.", $LOG_TYPE_PRIORITY_WATCHDOG, $LOG_LEVEL_ERROR)
+        ReDim $aPriorityWatchPIDs[$iPrevLen]
+        Return
+    EndIf
     _ArrayAdd($aPriorityWatchNames, $sPriorityName)
+    If @error Then
+        _LogMessage("LockProcessPriority: failed to add name. Rolling back.", $LOG_TYPE_PRIORITY_WATCHDOG, $LOG_LEVEL_ERROR)
+        ReDim $aPriorityWatchPIDs[$iPrevLen]
+        ReDim $aPriorityWatchTargets[$iPrevLen]
+        Return
+    EndIf
 
     If $bWasEmpty Then AdlibRegister("_PriorityWatchdog", $PRIORITY_WATCHDOG_MS)
 
