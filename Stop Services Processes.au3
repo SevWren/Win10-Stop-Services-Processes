@@ -117,14 +117,14 @@ ConsoleWrite("DEBUG: Log file path is: " & $sLogFile & @CRLF)
 
 If Not FileExists($sLogFile) Then
     ConsoleWrite("DEBUG: Log file does not exist. Attempting to create." & @CRLF)
-    Dim $sLogDir = StringRegExpReplace($sLogFile, "\\[^\\]+$", "")
+    Global $sLogDir = StringRegExpReplace($sLogFile, "\\[^\\]+$", "")
     DirCreate($sLogDir)
     If @error Then
         ConsoleWrite("FATAL ERROR: Could not create directory: " & $sLogDir & " (Error: " & @error & "). Script cannot continue logging." & @CRLF)
     Else
         ConsoleWrite("DEBUG: Directory exists or was created. Writing initial log entry directly." & @CRLF)
-        Dim $sDateTime = _NowTime(12) & " " & @MDAY & "/" & @MON & "/" & @YEAR
-        Dim $sLogEntry = $sDateTime & " [" & $LOG_TYPE_SYSTEM & "] Log file initialized"
+        Global $sDateTime = _NowTime(12) & " " & @MDAY & "/" & @MON & "/" & @YEAR
+        Global $sLogEntry = $sDateTime & " [" & $LOG_TYPE_SYSTEM & "] Log file initialized"
         FileWrite($sLogFile, $sLogEntry & @CRLF)
         If @error Then
             ConsoleWrite("FATAL ERROR: Could not write initial entry to log file: " & $sLogFile & " (Error: " & @error & "). Check permissions or antivirus." & @CRLF)
@@ -240,7 +240,6 @@ Func _RunServiceBatchStop()
     For $i = 0 To UBound($aResults) - 1
         Local $sSvcName = $aResults[$i][0]
         Local $sOutcome = $aResults[$i][3]
-        Local $iWin32   = $aResults[$i][4]
         Select
             Case $sOutcome = $SM_OUTCOME_STOPPED
                 _LogMessage("Service stopped: " & $sSvcName, $LOG_TYPE_SERVICE, $LOG_LEVEL_INFO)
@@ -251,6 +250,7 @@ Func _RunServiceBatchStop()
             Case $sOutcome = $SM_OUTCOME_UNAVAILABLE
                 _LogMessage("Service not found: " & $sSvcName, $LOG_TYPE_SERVICE, $LOG_LEVEL_VERBOSE)
             Case $sOutcome = $SM_OUTCOME_FAILED
+                Local $iWin32 = $aResults[$i][4]
                 _LogMessage("Service stop failed: " & $sSvcName & " (Win32: " & $iWin32 & ")", $LOG_TYPE_SERVICE, $LOG_LEVEL_ERROR)
             Case Else
                 _LogMessage("Service outcome unknown: " & $sSvcName & " (" & $sOutcome & ")", $LOG_TYPE_SERVICE, $LOG_LEVEL_ERROR)
@@ -315,7 +315,7 @@ Func SetProcessPriority()
         Return
     EndIf
 
-    Local $iPriorityConst
+    Local $iPriorityConst = $AUTOIT_PRIORITY_NORMAL  ; default to Normal (2)
     Switch $sPriorityLevel
         Case "1"
             $iPriorityConst = $AUTOIT_PRIORITY_BELOW_NORMAL
@@ -338,7 +338,7 @@ Func SetProcessPriority()
 
     Local $iSuccessCount = 0
     Local $iFailureCount = 0
-    Local $sPriorityName
+    Local $sPriorityName = "Normal"                   ; default to Normal
     Switch $iPriorityConst
         Case $AUTOIT_PRIORITY_BELOW_NORMAL
             $sPriorityName = "Below Normal"

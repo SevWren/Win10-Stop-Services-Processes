@@ -76,7 +76,7 @@ Summary of the three tiers — `CODING_STANDARDS.md` §Function Naming is the au
 
 - Hotkey-triggered (public): `PascalCase` — `ToggleScript`, `SetProcessPriority`, `LockProcessPriority`
 - Internal/private: `_UnderscorePascalCase` — `_KillProcessList`, `_LogMessage`, `_PriorityWatchdog`
-- Service-manager module: `_SM_PascalCase` — `_SM_StopServicesBatch`, `_SM_GetServiceState` (functions in `Includes/ServiceManager.au3` only)
+- Service-manager module: `_SM_PascalCase` — `_SM_StopServicesBatch` (functions in `Includes/ServiceManager.au3` only)
 
 If this section and `CODING_STANDARDS.md` ever conflict, `CODING_STANDARDS.md` wins.
 

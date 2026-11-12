@@ -91,7 +91,7 @@
 #include <AutoItConstants.au3>
 #include <MsgBoxConstants.au3>
 #include "Includes\ServiceManager.au3"
-#EndRegion
+#EndRegion ;Includes
 
 ; Win32 error codes used in tests
 Global Const $ERR_ACCESS_DENIED         = 5

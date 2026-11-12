@@ -19,7 +19,6 @@ Stop Services Processes.au3   ← entry point, scheduling, interaction
   │         _SM_StopServicesBatch(ByRef $aNames, $iBatchTimeoutMs, $iPollIntervalMs)
   │         → Returns 2D array; one result row per input service
   │       Internal only (not called from main script):
-  │         _SM_GetServiceState($hService)          ; uses inline "advapi32.dll" string
   │         _SM_ServiceStateToString($iState)
   │         _SM_Win32ErrToOutcome($iWin32Err)
   │         _SM_IsStopEligible($iState)
@@ -96,7 +95,7 @@ Global Const $SVC_BATCH_POLL_MS           = 500    ; poll interval within batch-
 
 **Rationale**: The enterprise prompt mandates `QueryServiceStatusEx` and `SERVICE_STATUS_PROCESS`.
 However, the actual implementation in `Includes/ServiceManager.au3` uses `QueryServiceStatus`
-throughout (Phase 1 inspect, Phase 2 poll, and `_SM_GetServiceState` helper). This is a deliberate
+throughout (Phase 1 inspect, Phase 2 poll). This is a deliberate
 simplification because:
 
 1. The two additional fields in `SERVICE_STATUS_PROCESS` are `dwProcessId` (field 8) and

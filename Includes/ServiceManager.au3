@@ -52,7 +52,7 @@ Global Const $SM_STATE_PAUSED           = 7
 ; Outcome string constants
 ; ---------------------------------------------------------------------------
 Global Const $SM_OUTCOME_STOPPED        = "STOPPED"
-Global Const $SM_OUTCOME_ALREADY_STOPPED_STOPPED = "ALREADY_STOPPED"
+Global Const $SM_OUTCOME_ALREADY_STOPPED        = "ALREADY_STOPPED"
 Global Const $SM_OUTCOME_UNAVAILABLE    = "UNAVAILABLE"
 Global Const $SM_OUTCOME_FAILED         = "FAILED"
 Global Const $SM_OUTCOME_TIMED_OUT      = "TIMED_OUT"
