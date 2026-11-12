@@ -33,6 +33,11 @@ The module and test harness were built, code-reviewed, and all BLOCKER/CRITICAL/
 - `docs/reviews/REVIEW-ServiceManager.Tests.au3.md` written — APPROVED WITH CONDITIONS; conditions resolved.
 - AU3Check gate: NOT RUN — Windows binary unavailable in Linux sandbox (documented in `docs/wiki/blockers.md` B-001).
 
+**Additional fixes applied in the latest session (2026-11-12):**
+- BUG-02 (`$iPendLen` redeclaration): `Local $iPendLen` was declared inside the Phase 1 `For` loop body, causing an AU3Check `-w 3` redeclaration warning on every iteration. Fixed by moving the declaration to function scope (before the loop). No runtime behavior change. (Ref: `docs/reviews/bugs/BUG-02-ipendlen-redecl.md`)
+- BUG-03 (`_SM_GetServiceState` dead code): The function was defined but never called — not from `_SM_StopServicesBatch`, not from the test harness, and not from `Stop Services Processes.au3`. Deleted the function definition (lines 382–410 including doc-comment) and removed its entry from the file header's INTERNAL HELPERS block. (Ref: `docs/reviews/bugs/BUG-03-sm-getservicestate.md`)
+- TDD-01 (`$SM_OUTCOME_ALREADY_STOPPED` / `$SM_OUTCOME_TIMED_OUT` rename): `$SM_OUTCOME_ALREADY` and `$SM_OUTCOME_TIMEDOUT` were renamed to exactly mirror their string values (`$SM_OUTCOME_ALREADY_STOPPED` and `$SM_OUTCOME_TIMED_OUT`). 11 identifiers updated across `Includes/ServiceManager.au3`, `Stop Services Processes.au3`, and `Tests/ServiceManager.Tests.au3`. No string values or logic changed. (Ref: `docs/reviews/bugs/BUG-04-outcome-names.md`)
+
 **What remains open (acknowledged gap, not a blocker per REQ-009):**
 - CR-03 (P-03): The two-phase batch algorithm (Phase 1 stop dispatch, Phase 2 shared-deadline polling) has no behavioral test coverage. `_Test_EmptyInput` is the only test that calls `_SM_StopServicesBatch` directly, and it passes an empty array — exercising only the SCM-open and early-return path. The Phase 2 polling loop is untested by the harness. This gap is accepted per REQ-009 and the Linux sandbox constraint (B-003); the requirements register records the verification method for REQ-003 as static inspection, not test execution.
 

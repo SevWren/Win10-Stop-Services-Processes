@@ -183,3 +183,61 @@ The 10+ parallel agents per team pattern that made this session feasible has no 
 - **CLAUDE.md staleness accumulates fast**: Three function renames happened early in the session and CLAUDE.md was not updated until the second-pass sweep caught them. A lightweight "update CLAUDE.md if you rename a function" rule in CODING_STANDARDS.md would catch this earlier.
 
 - **Circular authority references**: The `CODING_STANDARDS.md` ↔ `CLAUDE.md` naming authority loop burned review cycles across CR2-17, CR2-32, and CR2-08. Any two-document authority chain should designate one document as the winner at setup time, not at retro time.
+
+---
+
+## Bug Investigation Round
+
+This section records process improvements surfaced specifically by the BUG-01 through BUG-12 investigation series and the issues they exposed.
+
+---
+
+### Automated check — Post-rename doubled-suffix grep
+
+**Triggered by**: MED-03 (`$SM_OUTCOME_ALREADY_STOPPED_STOPPED` incident).
+
+During the BUG-04 fix pass, `$SM_OUTCOME_ALREADY` was renamed to `$SM_OUTCOME_ALREADY_STOPPED` and `$SM_OUTCOME_TIMEDOUT` was renamed to `$SM_OUTCOME_TIMED_OUT`. The rename was applied correctly in that pass, but the incident pattern — renaming `$SM_OUTCOME_X` to `$SM_OUTCOME_X_SUFFIX` across multiple constants in a single bulk operation — creates a mechanical risk: if any occurrence already carries a partial suffix from a prior rename, the result is a doubled suffix (e.g., `$SM_OUTCOME_ALREADY_STOPPED_STOPPED`).
+
+**New automated check**: After any bulk rename of `$SM_OUTCOME_*` constants (or any constant family using a descriptive suffix), run:
+
+```
+grep -r "_STOPPED_STOPPED\|_OUT_OUT\|_ED_ED" *.au3
+```
+
+This catches doubled suffixes with zero false positives against the current codebase. The general rule: when renaming `$SM_OUTCOME_X` to `$SM_OUTCOME_X_SUFFIX`, grep for `_SUFFIX_SUFFIX` patterns in all `.au3` files immediately afterwards before committing.
+
+---
+
+### New coding standard — `_ArrayAdd` on parallel arrays requires immediate `@error` checks
+
+**Triggered by**: HIGH-07 (`LockProcessPriority` parallel array desync on `_ArrayAdd` failure).
+
+The three parallel arrays `$aPriorityWatchPIDs`, `$aPriorityWatchTargets`, and `$aPriorityWatchNames` are appended to by sequential `_ArrayAdd` calls with no `@error` checks. A failure on any one call desynchronises array lengths, causing silent wrong-priority restores in `_PriorityWatchdog`.
+
+**New standard to add to `CODING_STANDARDS.md` under "Parallel array operations"**: `_ArrayAdd` calls on parallel arrays must ALWAYS be followed immediately by `@error` checks. On any failure, all preceding successful adds within the same logical operation must be rolled back (or the operation must abort with user notification) before returning. Never allow parallel arrays to diverge silently.
+
+---
+
+### New coding standard — `AdlibRegister` callbacks must guard against re-entry on shared resources
+
+**Triggered by**: HIGH-06 (`_LogMessage` re-entrancy corruption via `AdlibRegister`).
+
+AutoIt `AdlibRegister` callbacks fire between bytecode instructions, including inside functions that hold open file handles or are in the middle of modifying globals. `_PriorityWatchdog` is registered via `AdlibRegister` and can interrupt `_LogMessage` between its `FileOpen` and `FileClose` calls, causing the inner `_LogMessage` invocation to open a second handle to the same log file. The outer write then overwrites the inner entry, producing silent log data loss.
+
+**New standard to add to `CODING_STANDARDS.md` under "AdlibRegister and re-entrancy"**: Functions registered with `AdlibRegister` create re-entrancy risk for any shared resource (file handles, globals). Any function that holds a file handle open across multiple statements, or that reads-and-writes a shared global non-atomically, must guard against re-entry with a boolean guard global checked on entry. If the guard is set, the function must either queue its work or return immediately without touching the shared resource.
+
+---
+
+### Environment improvement — Post-bulk-rename doubled-suffix grep should be a standing step
+
+**Triggered by**: MED-03 (`$SM_OUTCOME_ALREADY_STOPPED_STOPPED` doubled-suffix incident).
+
+The doubled-suffix incident would have been caught immediately by a one-line grep run after the bulk constant rename. This grep requires no tooling beyond what is already available in the sandbox and takes under a second on the current codebase.
+
+**Standing post-rename step**: After any bulk rename of constants in `*.au3` files, run:
+
+```
+grep -r "_STOPPED_STOPPED\|_OUT_OUT\|_ED_ED" *.au3
+```
+
+This command should produce zero output. Any match indicates a doubled suffix from a rename collision and must be resolved before committing. Add this step to the fix-agent checklist for any task that renames more than one constant in a family.

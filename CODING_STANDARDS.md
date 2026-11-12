@@ -75,11 +75,12 @@ All `.au3` files must satisfy `AU3Check -q -d -w 1 -w 2 -w 3 -w 4`:
 - Declare all variables with `Local` or `Global` before use
 - Use `Dim` only for variables in the global scope outside a function
 - Avoid shadowed variable names between Global and Local scopes
+- Production globals use no prefix convention — just the variable name. Reserve `g_` prefix exclusively for test harness globals.
 
 ## Test File Conventions
 
 - Test files live under `Tests/` (e.g., `Tests/ServiceControl.Tests.au3`) or use the `*.Tests.au3` naming suffix (e.g., `Includes/ServiceControl.Tests.au3`).
-- The `g_` prefix for global variables in test harnesses is an accepted convention within test files and does not violate the standard variable naming rules applied to production code.
+- The `g_` prefix for global variables in test harnesses is an accepted convention within test files and does not violate the standard variable naming rules applied to production code. The `g_` prefix for globals (`$g_iTestCount`, etc.) is ONLY for test harness files. Production globals in `Stop Services Processes.au3` and `Includes/ServiceManager.au3` use no such prefix.
 - Test harness files may use `ConsoleWrite` directly (see Logging → CR-03 exception above).
 - Test helper functions follow the same two-tier naming as production code (`PascalCase` / `_UnderscorePascalCase`). The `_SM_PascalCase` tier is not used in test files — only in `Includes/ServiceManager.au3` itself.
 

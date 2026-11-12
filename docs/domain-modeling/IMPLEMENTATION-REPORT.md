@@ -244,3 +244,28 @@ The following verification gates cannot be executed in the Linux sandbox and rem
 2. **Gate 2** — Compile x86 and x64 with AutoIt3Wrapper; confirm `.\release\Stop Services - Processes.exe` is produced.
 3. **Gate 3** — Run `Tests/ServiceManager.Tests.au3` with `AutoIt3.exe`; confirm exit code 0 and all 11 test functions pass; paste result summary into Gate 3.
 4. **Gate 4** — Live service-state integration check on a Windows machine with the target services installed.
+
+---
+
+## Third Pass Session (2026-11-12 — Bug Investigation + AU3Check Hardening)
+
+**Bugs found and fixed:**
+- BUG-08: Parallel array desync in LockProcessPriority (atomic rollback added)
+- BUG-09: _LogMessage re-entrancy race with AdlibRegister callbacks ($bLogBusy guard)
+- BUG-10: ToggleScript double-activation race (HotKeySet disable on entry)
+- BUG-12 CRITICAL: Test file #include at line 500 (moved to top — eliminated ~40 AU3Check warnings)
+- BUG-12: $SM_OUTCOME_ALREADY_STOPPED_STOPPED doubled suffix (typo from rename)
+- BUG-02: Local $iPendLen redeclaration in loop (moved to function scope)
+- Dead code: $taskcloseran, $PROCESS_IDLE, _SM_GetServiceState removed
+
+**AU3Check hardening:**
+- SetProcessPriority() uninitialized variables (default initializers added)
+- $iWin32 dead variable moved inside FAILED branch
+- Dim at global scope changed to Global
+- ServiceControl.au3: 51 Global → Global Const
+- #EndRegion labels added throughout
+
+**Documentation updates:**
+- ADR-0012 written (ServiceControl.au3 keep-vs-delete decision)
+- Issues 08 and 09 created in scratch tracker
+- BUG-INDEX.md created with 32 tracked items

@@ -118,6 +118,7 @@ To disable this function:
 - The script requires administrative privileges to run (`#RequireAdmin`).
 - The icon path (`$iconfile`) and log file path (`$sLogFile`) may need to be updated for your system if the defaults do not apply.
 - Service stop outcomes are logged but not retried; a `TIMED_OUT` result means the service did not reach the `STOPPED` state within the 20-second batch deadline.
+- **WaaSMedicSvc**: Protected by the OS on Windows 10 1803+. Stop attempts return `ERROR_ACCESS_DENIED (5)` and produce `FAILED` outcome entries in the log every cycle. This is expected behavior — the service cannot be stopped by user-mode code.
 
 ## Changelog
 

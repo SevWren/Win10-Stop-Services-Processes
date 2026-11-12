@@ -29,4 +29,4 @@ Graceful-only stop via `SERVICE_CONTROL_STOP`. No force-kill fallback is impleme
 - The implementation stays within the SCM cooperative-stop contract, which is the documented and supported path for all Windows service types.
 
 **Negative:**
-- A service that persistently ignores `SERVICE_CONTROL_STOP` (e.g., a protected or malfunctioning service) will never be stopped by this tool. The outcome will remain `TIMED_OUT` on every cycle until the service is stopped by other means.
+- A service that persistently ignores `SERVICE_CONTROL_STOP` (e.g., a protected or malfunctioning service) will never be stopped by this tool. A service that persistently ignores stop controls produces `TIMED_OUT`. A service that actively rejects the stop control (e.g., a protected service returning `ERROR_ACCESS_DENIED`) produces `FAILED` immediately.

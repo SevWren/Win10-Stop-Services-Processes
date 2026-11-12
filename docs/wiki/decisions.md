@@ -153,6 +153,65 @@ calling `_SM_*` internals directly and never adding stop logic to ServiceControl
 
 **ADR**: [docs/adr/0011-convention-only-module-boundary.md](../adr/0011-convention-only-module-boundary.md)
 
+## D-011 — `$sProcesses[18]` Promoted to Configuration Region (2026-11-12)
+
+**Decision**: `$sProcesses[18]` (the process kill target list) is moved from the
+`Variables/Logging` region into the `Configuration — Target lists` region of
+`Stop Services Processes.au3`, immediately after `$aSvcTargetNames[9]`.
+
+**Why**: Both arrays are user-editable configuration inputs of identical nature. Placing
+them in the same region makes them discoverable together and removes the misleading
+implication that the process list is runtime state. No callers change — only the region
+boundary moves.
+
+**BUG report**: [MED-01](../reviews/bugs/BUG-INDEX.md#med-01----sprocesses18-declared-in-variableslogging-region-instead-of-configuration--target-lists)
+
+## D-012 — `$bLogBusy` Re-entrancy Guard in `_LogMessage` (2026-11-12)
+
+**Decision**: A boolean re-entrancy guard (`$bLogBusy`) is added to `_LogMessage`. On
+entry the guard is checked; if already set, the new message is written directly to the
+file after the outer call's `FileClose` rather than opening a competing handle. The guard
+is set before `FileOpen` and cleared after `FileClose`.
+
+**Why**: AutoIt `AdlibRegister` callbacks fire between bytecode instructions, including
+inside `_LogMessage`. A `_PriorityWatchdog` interrupt between `FileOpen` and `FileWrite`
+in an outer `_LogMessage` call opens a second append handle to the same log file. When the
+outer call resumes with its stale file pointer, it overwrites the watchdog entry rather
+than appending after it. The guard eliminates the competing-handle window.
+
+**BUG report**: [HIGH-06 / BUG-09](../reviews/bugs/BUG-09-log-rotation.md)
+
+## D-013 — `HotKeySet` Disable/Reenable Pattern in `ToggleScript` (2026-11-12)
+
+**Decision**: `ToggleScript` disables the `Shift+F1` hotkey (`HotKeySet("{F1}")` with no
+callback) as its first statement and re-enables it (`HotKeySet("{F1}", "ToggleScript")`)
+as its last statement before returning, bracketing the `MsgBox` yield and the
+`$bScriptRunning` state transition.
+
+**Why**: AutoIt delivers queued hotkeys at `MsgBox` yield points. With `$bScriptRunning =
+True` set after the yield, a second `Shift+F1` press during the 1-second `MsgBox` enters
+a second `ToggleScript` invocation while `$bScriptRunning` is still `False`. Both
+invocations enter the `While $bScriptRunning` loop simultaneously. Disabling the hotkey
+for the duration of the function closes the delivery window without requiring a mutex.
+
+**BUG report**: [HIGH-05 / BUG-10](../reviews/bugs/BUG-10-hotkey-reentrancy.md)
+
+## D-014 — Parallel Array Atomic Rollback in `LockProcessPriority` (2026-11-12)
+
+**Decision**: The three `_ArrayAdd` calls in `LockProcessPriority` (appending to
+`$aPriorityWatchPIDs`, `$aPriorityWatchTargets`, and `$aPriorityWatchNames`) each check
+`@error` immediately after the call. On any failure, all preceding successful adds are
+rolled back by decrementing `$aPriorityWatch*[0]` (the UBound counter used by AutoIt
+arrays), restoring size parity before returning.
+
+**Why**: The three arrays are index-parallel: `_PriorityWatchdog` reads all three by the
+same loop index. If one `_ArrayAdd` fails and the arrays diverge in size, subsequent
+watchdog iterations silently read `""` for out-of-range indices and pass priority `0`
+(Idle) to `ProcessSetPriority` — a wrong-priority silent restore. The rollback keeps the
+invariant that all three arrays are always the same length.
+
+**BUG report**: [HIGH-07 / BUG-08](../reviews/bugs/BUG-08-watchdog-arrays.md)
+
 ## Session Note — Second-Pass Resolutions (2026-11-12)
 
 **Blockers resolved**:

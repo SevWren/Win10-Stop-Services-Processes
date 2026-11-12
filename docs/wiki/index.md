@@ -53,3 +53,7 @@ No ADR directory exists yet in this repository. Architecture decision rationale 
 | T04 Integration | complete | Main script calls `_SM_StopServicesBatch` via `_RunServiceBatchStop` |
 | T05 Independent Code Review | complete | — |
 | T06 Validation + Delivery | complete | — |
+
+**Branch commit count**: 5 commits on `arch/service-manager-migration` (above the pre-branch baseline).
+
+**Third-pass investigation**: A third pass of bug investigation was completed (2026-11-12), producing D-011 through D-014 in `decisions.md` and BUG-08 through BUG-10 fix decisions. See [decisions.md](decisions.md) for entries.

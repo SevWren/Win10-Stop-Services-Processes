@@ -63,7 +63,9 @@ repository.
 
 ## B-005 — QueryServiceStatusEx / SERVICE_STATUS_PROCESS Discrepancy (2026-11-12)
 
-**Status**: OPEN — recorded decision exists, but downstream documents not fully updated
+**Status**: RESOLVED
+
+**Resolved**: REQ-017 added, ADR-0009 written, ARCHITECTURE.md API section added, I&V Gate 5 updated with REQ-017 evidence.
 
 The enterprise prompt explicitly mandated `QueryServiceStatusEx` and `SERVICE_STATUS_PROCESS`
 (9-DWORD struct). The implementation uses `QueryServiceStatus` with the 7-DWORD `SERVICE_STATUS`
@@ -71,17 +73,14 @@ struct throughout. ADR-0009 (`docs/adr/0009-queryservicestatus-api-selection.md`
 rationale: the two extra fields (`dwProcessId`, `dwServiceFlags`) are unused by the batch-stop
 algorithm, and the simpler API eliminates two additional DllCall parameters with no functional loss.
 
-However, as of the session end the following downstream cleanup items remain open:
+The downstream cleanup items have been addressed:
 
-1. `docs/REQUIREMENTS.md` — no REQ row requires or verifies `QueryServiceStatusEx`; CR-05
-   SPEC-S02 flagged this as MAJOR. A REQ row should either confirm the simpler API as the
-   accepted implementation or cross-reference ADR-0009.
-2. `docs/REQUIREMENTS.md` — all 14 REQ rows still carry "Implementation pending (T03/T04)"
-   status fields (CR-05 STD-S01 / SPEC-S03, flagged MAJOR). Task 6 required these to be
-   updated from execution evidence.
-3. `docs/IMPLEMENTATION-AND-VERIFICATION.md` Gate 1 — contains predicted compliance assertions
-   in a NOT RUN gate, violating the spec's prohibition on predicted outcomes (CR-05 STD-S03,
-   flagged MAJOR).
+1. REQ-017 added to `docs/REQUIREMENTS.md` documenting the API selection decision and
+   cross-referencing ADR-0009.
+2. ADR-0009 written at `docs/adr/0009-queryservicestatus-api-selection.md` formally recording
+   the decision.
+3. `docs/ARCHITECTURE.md` updated with the QueryServiceStatus API choice section.
+4. `docs/IMPLEMENTATION-AND-VERIFICATION.md` Gate 5 updated with REQ-017 evidence.
 
 **Identified by**: CR-04 SP-01 (MAJOR); CR-05 SPEC-S02 (MAJOR); ADR-0009 (decision recorded
 2026-11-12).

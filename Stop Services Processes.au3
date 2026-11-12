@@ -79,12 +79,9 @@ Global Const $AUTOIT_PRIORITY_REALTIME     = 5
 Global $aSvcTargetNames[9] = [ _
     "FDResPub", "fdPHost", "TrustedInstaller", "wuauserv", _
     "UsoSvc", "DoSvc", "WaaSMedicSvc", "SSDPSRV", "sppsvc"]
-#EndRegion ;Configuration — Target lists
 
-#Region ;Variables/Logging
-Global $sStringInstaller   = "In the _KillProcessList function and just terminated"
-
-; Process inventory — processes closed every $PROC_POLL_INTERVAL_SEC seconds.
+; Process Inventory: processes closed every $PROC_POLL_INTERVAL_SEC seconds.
+; Edit here to add/remove process targets — do not modify _KillProcessList body.
 ; Note: "xgamehelper.exe" appears at index 15 and 16 (preserved as-is from baseline —
 ;   second close is a harmless no-op; see BASELINE-INVENTORY.md).
 Global $sProcesses[18] = [ _
@@ -92,6 +89,10 @@ Global $sProcesses[18] = [ _
     "VSSVC.exe", "msiexec.exe", "msedge.exe", "helppane.exe", "net.exe", "vmcompute.exe", _
     "msedgewebview2.exe", "update.exe", "AggregatorHost.exe", "dllhost.exe", "TCPSVCS.EXE", _
     "xgamehelper.exe", "xgamehelper.exe", "backgroundTaskHost.exe"]
+#EndRegion ;Configuration — Target lists
+
+#Region ;Variables/Logging
+Global $sStringInstaller   = "In the _KillProcessList function and just terminated"
 
 Global $bScriptRunning = False   ; tracks whether the monitoring loop is active
 Global $iLastStopServices  = TimerInit()  ; timer for service-stop cycle
@@ -109,7 +110,7 @@ Global $aPriorityWatchPIDs[0]      ; PIDs under watchdog
 Global $aPriorityWatchTargets[0]   ; corresponding target AutoIt priority constants (0–5)
 Global $aPriorityWatchNames[0]     ; corresponding human-readable priority names
 
-Global $g_bLogBusy = False         ; re-entrancy guard for _LogMessage file I/O
+Global $bLogBusy = False         ; re-entrancy guard for _LogMessage file I/O
 
 TraySetIcon($iconfile)
 ConsoleWrite("DEBUG: Starting log initialization." & @CRLF)
@@ -267,18 +268,18 @@ Func _LogMessage($sMessage, $sType, $iLevel)
     Local $sDateTime = _NowTime(12) & " " & @MDAY & "/" & @MON & "/" & @YEAR
     Local $sLogEntry = @CRLF & $sDateTime & " [" & $sType & "] " & $sMessage
 
-    If $g_bLogBusy Then Return
-    $g_bLogBusy = True
+    If $bLogBusy Then Return
+    $bLogBusy = True
 
     Local $hFile = FileOpen($sLogFile, 1)   ; Mode 1 = Append
     If $hFile = -1 Then
-        $g_bLogBusy = False
+        $bLogBusy = False
         ConsoleWrite("ERROR in _LogMessage: Could not open log file '" & $sLogFile & "' for writing. @error code = " & @error & @CRLF)
         Return
     EndIf
     FileWrite($hFile, $sLogEntry)
     FileClose($hFile)
-    $g_bLogBusy = False
+    $bLogBusy = False
 
     If $bLogToConsole Then
         ConsoleWrite($sLogEntry & @CRLF)
