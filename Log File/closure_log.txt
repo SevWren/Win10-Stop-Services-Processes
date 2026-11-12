@@ -1,3 +1,20 @@
+; ============================================================
+; HISTORICAL SAMPLE LOG — format is outdated
+;
+; This file was captured before the logging format was updated.
+; The entries below use the old dash-separator format:
+;
+;   <time> <DD/MM/YYYY> - <Type> '<name>' was closed.
+;   e.g.  12:34:29 PM 05/08/2024 - Service 'wuauserv' was closed.
+;
+; The current _LogMessage function (Stop Services Processes.au3)
+; produces bracketed type-tag entries instead:
+;
+;   <time> <DD/MM/YYYY> [<Type>] <message>
+;   e.g.  12:34:29 PM 05/08/2024 [Service] Service stopped: wuauserv
+;
+; Log types in use: System, Process, Service, ProcessPriority, PriorityWatchdog
+; ============================================================
 
 12:34:29 PM 05/08/2024 - Service 'wuauserv' was closed.
 

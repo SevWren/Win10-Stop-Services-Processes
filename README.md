@@ -9,7 +9,7 @@ It is designed to be a "set it and forget it" tool for managing irregular system
 
 - **Hotkey Control**: Use hotkeys to start, pause, and stop the script.
 - **Process Management**: Automatically closes a specified list of processes and logs the closures.
-- **Service Management**: Checks for running services, stops them if necessary, and logs the action.
+- **Service Management**: Stops a batch of 9 services each cycle via a native Windows SCM adapter (`Includes/ServiceManager.au3`). Each service produces a structured outcome (`STOPPED`, `ALREADY_STOPPED`, `UNAVAILABLE`, `FAILED`, `TIMED_OUT`) that is individually logged.
 - **Robust Logging**: A corrected and reliable logging system writes all actions to a file and the console.
 - **Window Event Handling**: Closes specific pop-up windows if they appear.
 - **Process Priority**: Allows setting process priority for all instances of an application by name using a hotkey.
@@ -52,29 +52,46 @@ The script automatically terminates the following processes:
 - `TCPSVCS.EXE`
 - `TrustedInstaller.exe` - To Prevent Automated Software Installs (Applies to mal-ware prevention)
 - `update.exe` - To Prevent Automated Software Installs (Applies to mal-ware prevention)
+- `UserOOBEBroker.exe`
+- `backgroundTaskHost.exe`
+- `xgamehelper.exe` (appears at index 15 and 16 — preserved duplicate; second close is a harmless no-op)
 
 ### Services
-The script stops the following services if they are running:
+The script stops the following 9 services each cycle (every 10 seconds) via `_SM_StopServicesBatch()` in `Includes/ServiceManager.au3`. Process kill cycle: every 2 seconds.
+- `FDResPub` (Function Discovery Resource Publication)
+- `fdPHost` (Function Discovery Provider Host)
 - `TrustedInstaller` - To Prevent Automated Software Installs (Applies to mal-ware prevention)
 - `wuauserv` (Windows Update)
 - `UsoSvc` (Update Orchestrator Service)
 - `DoSvc` (Delivery Optimization)
 - `WaaSMedicSvc` (Windows Update Medic Service)
+- `SSDPSRV` (SSDP Discovery)
 - `sppsvc` (Software Protection Service)
 
-Special handling is implemented for `sppsvc` to ensure proper termination.
+The batch-stop module opens the Windows Service Control Manager (SCM) once per cycle, issues stop controls to all eligible services without serial waiting, then polls all pending services against a shared 20-second deadline. Each service returns one of five outcome codes: `STOPPED`, `ALREADY_STOPPED`, `UNAVAILABLE`, `FAILED`, or `TIMED_OUT`.
+
+## Module Structure
+
+| File | Role |
+|---|---|
+| `Stop Services Processes.au3` | Main orchestration script: hotkeys, scheduling loop, process termination, logging |
+| `Includes/ServiceManager.au3` | Windows SCM batch-stop module — authoritative for all service-stop operations |
+| `Includes/ServiceControl.au3` | Legacy per-service SCM utilities (`_ServiceExists`, `_ServiceRunning`, `_StartService`, `_CreateService`, `_DeleteService`) — retained but not used for stop operations |
+| `Tests/ServiceManager.Tests.au3` | Deterministic test harness for `ServiceManager.au3` — no live service stops |
 
 ## Setup
 
 1. **Requirements**: Ensure you have [AutoIt](https://www.autoitscript.com/site/autoit/downloads/) installed if you want to run or edit the `.au3` source code. The compiled `.exe` from the Releases page does not require an AutoIt installation.
 
-2. **Icon**: (Optional) To use a custom icon, edit `Global $iconfile` with the path to your desired `.ico` file.
+2. **File Layout**: Keep the `Includes\` folder in the same directory as `Stop Services Processes.au3`. All include paths are working-directory-relative (e.g., `#include "Includes\ServiceManager.au3"`), so no hardcoded paths need to be updated when moving the script.
 
-3. **Log File**: (Optional) Edit `Global $sLogFile` to your preferred log file location.
+3. **Icon**: (Optional) To use a custom icon, edit `Global $iconfile` with the path to your desired `.ico` file.
 
-4. **Processes and Services**: (Optional) Customize the `$sProcesses` and `$aServiceNames` arrays to include the processes and services you want to manage.
+4. **Log File**: (Optional) Edit `Global $sLogFile` to your preferred log file location. The default is `%HOMEDRIVE%\login\closure_log.txt`.
 
-5. **Logging Configuration**: (Optional)
+5. **Processes and Services**: (Optional) Customize the `$sProcesses` array (process termination list) or edit `$aSvcTargetNames` in the `#Region ;Configuration — Target lists` block near the top of `Stop Services Processes.au3` to manage different processes or services.
+
+6. **Logging Configuration**: (Optional)
    - Adjust `$iLogLevel` (0=Errors only, 1=Basic logging, 2=Detailed logging).
    - Set `$bLogToConsole` to `True` or `False`.
 
@@ -99,7 +116,8 @@ To disable this function:
 ## Known Limitations
 
 - The script requires administrative privileges to run (`#RequireAdmin`).
-- The default paths for the icon and log file are hardcoded and may need to be updated for your system.
+- The icon path (`$iconfile`) and log file path (`$sLogFile`) may need to be updated for your system if the defaults do not apply.
+- Service stop outcomes are logged but not retried; a `TIMED_OUT` result means the service did not reach the `STOPPED` state within the 20-second batch deadline.
 
 ## Changelog
 

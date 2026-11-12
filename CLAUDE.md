@@ -12,6 +12,7 @@ An AutoIt v3 script that runs as a persistent background process (system tray) o
 Stop Services Processes.au3   ← primary script (only file to edit)
 Includes/
   ServiceControl.au3          ← custom DllCall service library (advapi32.dll)
+  ServiceManager.au3          ← deep module for batch SCM stop operations. Single public function `_SM_StopServicesBatch`. Returns `[n][6]` result array — see ADR-0003 for error convention, ADR-0004 for incompatibility with `ServiceControl.au3`.
   AutoItConstants.au3         ← bundled standard AutoIt include
   Date.au3                    ← bundled standard AutoIt include
   Misc.au3                    ← bundled standard AutoIt include
@@ -48,17 +49,17 @@ The script runs a passive main loop (`While 1 / Sleep(50) / WEnd`). All meaningf
 | Hotkey | Function | Behavior |
 |---|---|---|
 | `Shift + F1` | `ToggleScript()` | Starts/stops the active monitoring loop |
-| `ScrollLock + PAUSE` | `_exit()` | Hard terminates the script |
+| `ScrollLock + PAUSE` | `_Exit()` | Hard terminates the script |
 | `Ctrl + Shift + 9` | `SetProcessPriority()` | One-shot: sets priority for all instances of a named process |
 | `Ctrl + Alt + Shift + 9` | `LockProcessPriority()` | Locks a specific PID's priority; watchdog auto-restores on drift |
 
 ### Active Monitoring Loop (`ToggleScript`)
 When started via Shift+F1, runs `While $bScriptRunning` and calls:
-- `_CloseInstaller()` — kills processes in `$sProcesses[]` array every ~2 seconds
-- `_stopservicescustom()` — stops services in `$aServiceNames[]` every ~2 seconds
-- `_miscpopups()` — closes specific application registration dialogs
+- `_KillProcessList()` — kills processes in `$sProcesses[]` array every 2 seconds (`$PROC_POLL_INTERVAL_SEC = 2`)
+- `_RunServiceBatchStop()` — stops services in `$aSvcTargetNames[]` every 10 seconds (`$SVC_POLL_INTERVAL_SEC = 10`); process-kill cycle remains every 2 seconds
+- `_MiscPopups()` — closes specific application registration dialogs
 
-Timing uses `TimerInit()` / `TimerDiff()` via `CheckElapsedTime($iStartTime, $iIntervalSeconds)`.
+Timing uses `TimerInit()` / `TimerDiff()` via `_CheckElapsedTime($iStartTime, $iInterval)`.
 
 ### Priority Watchdog (`LockProcessPriority` + `_PriorityWatchdog`)
 - `LockProcessPriority()`: collects PID + priority via `InputBox`, sets immediately, appends to three parallel global arrays, calls `AdlibRegister("_PriorityWatchdog", 10000)` only on first entry.
@@ -70,8 +71,14 @@ Timing uses `TimerInit()` / `TimerDiff()` via `CheckElapsedTime($iStartTime, $iI
 ## Coding Conventions
 
 ### Function Naming
+
+Summary of the three tiers — `CODING_STANDARDS.md` §Function Naming is the authority; this section is a reference kept in sync with it.
+
 - Hotkey-triggered (public): `PascalCase` — `ToggleScript`, `SetProcessPriority`, `LockProcessPriority`
-- Internal/private: `_UnderscorePascalCase` — `_CloseInstaller`, `_LogMessage`, `_PriorityWatchdog`
+- Internal/private: `_UnderscorePascalCase` — `_KillProcessList`, `_LogMessage`, `_PriorityWatchdog`
+- Service-manager module: `_SM_PascalCase` — `_SM_StopServicesBatch`, `_SM_GetServiceState` (functions in `Includes/ServiceManager.au3` only)
+
+If this section and `CODING_STANDARDS.md` ever conflict, `CODING_STANDARDS.md` wins.
 
 ### Logging
 All events go through `_LogMessage($sMessage, $sType, $iLevel)`:
@@ -130,6 +137,33 @@ If $iDllError Or Not $aResult[0] Then Return -1
 
 ---
 
+## DllCall Conventions — advapi32.dll
+
+Parallel reference for SCM-related DllCalls in `ServiceManager.au3` (and `ServiceControl.au3`).
+
+### SERVICE_STATUS struct
+Declared with `DllStructCreate("dword;dword;dword;dword;dword;dword;dword")` — 7 DWORD fields. `dwCurrentState` is **field 2** (1-based index used with `DllStructGetData`).
+
+### Handle types
+Use `"handle"` (not `"long"`) for both SCM handles and service handles:
+```autoit
+; SCM handle
+Local $aScmOpen = DllCall("advapi32.dll", "handle", "OpenSCManagerW", ...)
+Local $hSCM = $aScmOpen[0]
+
+; Service handle
+Local $aSvcOpen = DllCall("advapi32.dll", "handle", "OpenServiceW", "handle", $hSCM, ...)
+Local $hService = $aSvcOpen[0]
+```
+
+### Wide-string W-suffix entry points
+Always use the W-suffix (Unicode) variants:
+- `OpenSCManagerW` — opens the SCM; `lpMachineName` = `"ptr", 0` for local machine
+- `OpenServiceW` — opens a named service; service name passed as `"wstr"`
+- `QueryServiceStatus` — no W-suffix variant; takes a `SERVICE_STATUS` struct pointer via `"ptr", DllStructGetPtr(...)`
+
+---
+
 ## Priority Constant Mapping
 
 `_WinAPI_GetPriorityClass` / `GetPriorityClass` returns Windows API constants. `ProcessSetPriority` takes AutoIt constants. These are **different numbering schemes** — always use `_WinAPIPriorityClassToAutoItConst()` to convert.
@@ -148,7 +182,7 @@ If $iDllError Or Not $aResult[0] Then Return -1
 ## User Notifications
 
 Never use `TrayTip` for watchdog events — it produces large toast notifications on Windows 10/11.
-Always use `_TrayNotify($sMessage)` which calls `ToolTip()` positioned bottom-right and auto-clears after 3 seconds via `AdlibRegister("_ClearTrayNotify", 3000)`.
+Always use `_TrayNotify($sMessage)` which calls `ToolTip()` positioned bottom-right and auto-clears after 2 seconds via `AdlibRegister("_ClearTrayNotify", 2000)`.
 
 ---
 
@@ -159,6 +193,26 @@ Always use `_TrayNotify($sMessage)` which calls `ToolTip()` positioned bottom-ri
 ```
 - `-q` quiet, `-d` check undeclared variables, `-w 1-4` enable warning levels 1–4
 - All compiler warnings should be resolved before committing
+
+---
+
+## Agent skills
+
+### Issue tracker
+
+Issues live as local markdown files under `.scratch/service-manager-migration/issues/`, numbered in dependency order. See `docs/agents/issue-tracker.md`.
+
+### Domain docs
+
+Single-context layout: one `GLOSSARY.md` at the repo root plus ADRs under `docs/adr/`. See `docs/agents/domain.md`.
+
+### Architecture decisions
+
+Index of 10+ ADRs recorded in `docs/adr/README.md`. Records hard-to-reverse decisions about the codebase. Consult before proposing architectural changes.
+
+### Architecture overview
+
+High-level system design is documented in `docs/ARCHITECTURE.md`.
 
 ---
 
