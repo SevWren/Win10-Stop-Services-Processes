@@ -263,8 +263,8 @@ _Avoid_: audit event, action log entry
 The hand-rolled AutoIt testing infrastructure that runs the test suite and reports pass/fail results.
 _Avoid_: test suite (overloaded; see below), test runner (implies a separate tool, which does not exist here)
 
-**Assertion**
-: A single pass/fail check in the test harness: a predicate applied to actual output that must hold for the test to pass.
+**Assertion**:
+A single pass/fail check in the test harness: a predicate applied to actual output that must hold for the test to pass.
 _Avoid_: test, check, expectation (in the technical test-harness sense)
 _See also_: Test Harness, Deterministic Test
 

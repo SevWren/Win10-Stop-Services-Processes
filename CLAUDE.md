@@ -55,8 +55,8 @@ The script runs a passive main loop (`While 1 / Sleep(50) / WEnd`). All meaningf
 
 ### Active Monitoring Loop (`ToggleScript`)
 When started via Shift+F1, runs `While $bScriptRunning` and calls:
-- `_KillProcessList()` — kills processes in `$sProcesses[]` array every ~2 seconds
-- `_RunServiceBatchStop()` — stops services in `$aServiceNames[]` every 10 seconds (service stop cycle); process-kill cycle remains ~2 seconds
+- `_KillProcessList()` — kills processes in `$sProcesses[]` array every 2 seconds (`$PROC_POLL_INTERVAL_SEC = 2`)
+- `_RunServiceBatchStop()` — stops services in `$aSvcTargetNames[]` every 10 seconds (`$SVC_POLL_INTERVAL_SEC = 10`); process-kill cycle remains every 2 seconds
 - `_MiscPopups()` — closes specific application registration dialogs
 
 Timing uses `TimerInit()` / `TimerDiff()` via `_CheckElapsedTime($iStartTime, $iInterval)`.
@@ -71,11 +71,14 @@ Timing uses `TimerInit()` / `TimerDiff()` via `_CheckElapsedTime($iStartTime, $i
 ## Coding Conventions
 
 ### Function Naming
+
+Summary of the three tiers — `CODING_STANDARDS.md` §Function Naming is the authority; this section is a reference kept in sync with it.
+
 - Hotkey-triggered (public): `PascalCase` — `ToggleScript`, `SetProcessPriority`, `LockProcessPriority`
 - Internal/private: `_UnderscorePascalCase` — `_KillProcessList`, `_LogMessage`, `_PriorityWatchdog`
-- Service-manager module: `_SM_PascalCase` — `_SM_StopServicesBatch`, `_SM_GetServiceState`
+- Service-manager module: `_SM_PascalCase` — `_SM_StopServicesBatch`, `_SM_GetServiceState` (functions in `Includes/ServiceManager.au3` only)
 
-> `CODING_STANDARDS.md` is the authority on naming conventions, including the `_SM_` prefix tier introduced there. If this section and `CODING_STANDARDS.md` ever conflict, `CODING_STANDARDS.md` wins.
+If this section and `CODING_STANDARDS.md` ever conflict, `CODING_STANDARDS.md` wins.
 
 ### Logging
 All events go through `_LogMessage($sMessage, $sType, $iLevel)`:
